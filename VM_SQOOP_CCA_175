@@ -1,0 +1,2677 @@
+
+command for importing all RDBMS tables to hive WH :
+
+ sqoop import-all-tables --connect jdbc:mysql://quickstart/retail_db --username retail_dba --password cloudera --hive-import --hive-database rajeshs_sqoop_import --autoreset-to-one-mapper
+
+
+
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+
+mysql -u hr_user -h ms.itversity.com -p
+password : itversity
+
+[cloudera@quickstart ~]$ sqoop eval --connect jdbc:mysql://quickstart:3306/retail_db --username root --P --query "select * from order_items limit 10"
+
+
+mysql -u retail_dba -h quickstart -p
+
+password : cloudera
+
+  [cloudera@quickstart ~]$ mysql -u retail_dba -h quickstart -p
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| retail_db          |
++--------------------+
+
+mysql> use retail_db;
+
+mysql> show tables;
++---------------------+
+| Tables_in_retail_db |
++---------------------+
+| categories          |
+| customers           |
+| departments         |
+| order_items         |
+| orders              |
+| products            |
++---------------------+
+6 rows in set (0.00 sec)
+
+
+CREATE TABLE `orders_exported` (
+  `order_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_date` datetime NOT NULL,
+  `order_status` varchar(45) NOT NULL,
+  PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=68884 DEFAULT CHARSET=utf8 
+
+sqoop import 
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username retail_dba \
+  --password cloudera \
+  --table orders \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/orders
+
+  [cloudera@quickstart ~]$ hdfs dfs -ls /user/rajeshs/sqoop_import/retail_db/orders
+Found 5 items
+-rw-r--r--   1 cloudera supergroup          0 2018-08-27 07:43 /user/rajeshs/sqoop_import/retail_db/orders/_SUCCESS
+-rw-r--r--   1 cloudera supergroup     741614 2018-08-27 07:42 /user/rajeshs/sqoop_import/retail_db/orders/part-m-00000
+-rw-r--r--   1 cloudera supergroup     753022 2018-08-27 07:42 /user/rajeshs/sqoop_import/retail_db/orders/part-m-00001
+-rw-r--r--   1 cloudera supergroup     752368 2018-08-27 07:42 /user/rajeshs/sqoop_import/retail_db/orders/part-m-00002
+-rw-r--r--   1 cloudera supergroup     752940 2018-08-27 07:42 /user/rajeshs/sqoop_import/retail_db/orders/part-m-00003
+[cloudera@quickstart ~]$  hdfs dfs -cat /user/rajeshs/sqoop_import/retail_db/orders/part-m-00000 |head
+1,2013-07-25 00:00:00.0,11599,CLOSED
+2,2013-07-25 00:00:00.0,256,PENDING_PAYMENT
+3,2013-07-25 00:00:00.0,12111,COMPLETE
+4,2013-07-25 00:00:00.0,8827,CLOSED
+5,2013-07-25 00:00:00.0,11318,COMPLETE
+6,2013-07-25 00:00:00.0,7130,COMPLETE
+7,2013-07-25 00:00:00.0,4530,COMPLETE
+8,2013-07-25 00:00:00.0,2911,PROCESSING
+9,2013-07-25 00:00:00.0,5657,PENDING_PAYMENT
+10,2013-07-25 00:00:00.0,5648,PENDING_PAYMENT
+cat: Unable to write to output stream.
+
+
+mysql> select * from orders_exported limit 10;
+Empty set (0.16 sec)
+
+///sample export 
+
+  sqoop export \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--table orders_exported \
+--export-dir /user/rajeshs/sqoop_import/retail_db/orders \
+--columns order_id,order_date,order_status \
+--input-fields-terminated-by "," \
+--m 8
+
+// sample import 
+
+sqoop import \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--table customers \
+--target-dir /user/rajeshs/sqoop_import/retail_db/customers \
+-m 1
+
+
+
+//sample import-all-tables
+
+
+sqoop import-all-tables \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--warehouse-dir /user/rajeshs/sqoop_import_all/retail_db \
+-m 1
+
+[cloudera@quickstart ~]$ hdfs dfs -ls /user/rajeshs/sqoop_import_all/retail_db
+Found 9 items
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:00 /user/rajeshs/sqoop_import_all/retail_db/categories
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:02 /user/rajeshs/sqoop_import_all/retail_db/customers
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:03 /user/rajeshs/sqoop_import_all/retail_db/departments
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:05 /user/rajeshs/sqoop_import_all/retail_db/order_items
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:07 /user/rajeshs/sqoop_import_all/retail_db/orders
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:08 /user/rajeshs/sqoop_import_all/retail_db/orders_column_mapping
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:09 /user/rajeshs/sqoop_import_all/retail_db/orders_exported
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:11 /user/rajeshs/sqoop_import_all/retail_db/products
+drwxr-xr-x   - cloudera supergroup          0 2018-09-09 01:13 /user/rajeshs/sqoop_import_all/retail_db/t
+
+
+mysql> select * from orders_exported limit 10;
++----------+---------------------+--------------+
+| order_id | order_date          | order_status |
++----------+---------------------+--------------+
+|        1 | 2013-07-25 00:00:00 | 11599        |
+|        2 | 2013-07-25 00:00:00 | 256          |
+|        3 | 2013-07-25 00:00:00 | 12111        |
+|        4 | 2013-07-25 00:00:00 | 8827         |
+|        5 | 2013-07-25 00:00:00 | 11318        |
+|        6 | 2013-07-25 00:00:00 | 7130         |
+|        7 | 2013-07-25 00:00:00 | 4530         |
+|        8 | 2013-07-25 00:00:00 | 2911         |
+|        9 | 2013-07-25 00:00:00 | 5657         |
+|       10 | 2013-07-25 00:00:00 | 5648         |
++----------+---------------------+--------------+
+10 rows in set (0.01 sec)
+
+
+
+sqoop export \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--table orders_exported \
+--export-dir /user/rajeshs/sqoop_import/retail_db/orders \
+--columns order_id,order_date,order_status \
+--input-fields-terminated-by "\001"
+--m 8
+
+
+
+case 2 of export : column mapping :
+
+CREATE TABLE `orders_column_mapping` (
+  `order_date` datetime NOT NULL,
+    `order_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_status` varchar(45) NOT NULL,
+  PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=68884 DEFAULT CHARSET=utf8 
+
+
+mysql> CREATE TABLE `orders_column_mapping` (
+    ->   `order_date` datetime NOT NULL,
+    ->     `order_id` int(11) NOT NULL AUTO_INCREMENT,
+    ->   `order_status` varchar(45) NOT NULL,
+    ->   PRIMARY KEY (`order_id`)
+    -> ) ENGINE=InnoDB AUTO_INCREMENT=68884 DEFAULT CHARSET=utf8
+    -> ;
+Query OK, 0 rows affected (0.16 sec)
+
+mysql> select * from orders_column_mapping;
+Empty set (0.00 sec)
+
+
+
+sqoop export \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--table orders_column_mapping \
+--export-dir /user/rajeshs/sqoop_import/retail_db/orders \
+--columns order_id,order_date,order_status \   //manually mentioned order of columns according the hdfs records from where sqoop reads.
+--input-fields-terminated-by "\001"
+--m 8
+
+mysql> select * from orders_column_mapping limit 10;
++---------------------+----------+--------------+
+| order_date          | order_id | order_status |
++---------------------+----------+--------------+
+| 2013-07-25 00:00:00 |        1 | 11599        |
+| 2013-07-25 00:00:00 |        2 | 256          |
+| 2013-07-25 00:00:00 |        3 | 12111        |
+| 2013-07-25 00:00:00 |        4 | 8827         |
+| 2013-07-25 00:00:00 |        5 | 11318        |
+| 2013-07-25 00:00:00 |        6 | 7130         |
+| 2013-07-25 00:00:00 |        7 | 4530         |
+| 2013-07-25 00:00:00 |        8 | 2911         |
+| 2013-07-25 00:00:00 |        9 | 5657         |
+| 2013-07-25 00:00:00 |       10 | 5648         |
++---------------------+----------+--------------+
+10 rows in set (0.00 sec)
+
+
+sqoop export \
+--connect jdbc:mysql://quickstart/retail_db \
+--username retail_dba \
+--password cloudera \
+--table orders_column_mapping \
+--columns order_id,order_date,order_status \
+--export-dir /user/rajeshs/sqoop_import/retail_db/orders \
+--input-fields-terminated-by "," \
+-m 8
+
+
+
+
+
+
+
+
+/***************************************************************/
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items
+Outout :  
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 02:14:55 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 02:14:55 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 02:14:55 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 02:14:55 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 02:14:55 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:14:55 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:14:55 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/71bea81b715a787907d7b11bb8523109/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 02:14:57 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/71bea81b715a787907d7b11bb8523109/order_items.jar
+18/05/04 02:14:57 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 02:14:57 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 02:14:57 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 02:14:57 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 02:14:57 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 02:14:58 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 02:14:58 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 02:14:58 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 02:15:05 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 02:15:05 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/04 02:15:05 INFO db.IntegerSplitter: Split size: 43049; Num splits: 4 from: 1 to: 172198
+18/05/04 02:15:05 INFO mapreduce.JobSubmitter: number of splits:4
+18/05/04 02:15:06 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1222
+18/05/04 02:15:07 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1222
+18/05/04 02:15:07 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1222/
+18/05/04 02:15:07 INFO mapreduce.Job: Running job: job_1525279861629_1222
+18/05/04 02:15:17 INFO mapreduce.Job: Job job_1525279861629_1222 running in uber mode : false
+18/05/04 02:15:17 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 02:15:22 INFO mapreduce.Job:  map 25% reduce 0%
+18/05/04 02:15:23 INFO mapreduce.Job:  map 75% reduce 0%
+18/05/04 02:15:25 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 02:15:26 INFO mapreduce.Job: Job job_1525279861629_1222 completed successfully
+18/05/04 02:15:27 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=639068
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=512
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=16
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=8
+        Job Counters 
+                Launched map tasks=4
+                Other local map tasks=4
+                Total time spent by all maps in occupied slots (ms)=32324
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=16162
+                Total vcore-milliseconds taken by all map tasks=16162
+                Total megabyte-milliseconds taken by all map tasks=33099776
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=512
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=336
+                CPU time spent (ms)=10610
+                Physical memory (bytes) snapshot=1219710976
+                Virtual memory (bytes) snapshot=14863081472
+                Total committed heap usage (bytes)=981991424
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=5408880
+18/05/04 02:15:27 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 28.838 seconds (183.1647 KB/sec)
+18/05/04 02:15:27 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+[rajeshs@gw02 ~]$ 
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/sqoop_import/retail_db/order_items
+Found 5 items
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-03 14:37 /user/rajeshs/sqoop_import/retail_db/order_items/_SUCCESS
+-rw-r--r--   3 rajeshs hdfs    1303818 2018-05-03 14:37 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000
+-rw-r--r--   3 rajeshs hdfs    1343222 2018-05-03 14:37 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00001
+-rw-r--r--   3 rajeshs hdfs    1371917 2018-05-03 14:37 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00002
+-rw-r--r--   3 rajeshs hdfs    1389923 2018-05-03 14:37 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00003
+
+hdfs dfs -rmr /user/rajeshs/sqoop_import/retail_db/order_items
+
+
+2) customizing mappers count:
+--connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items
+Outout :  
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --num-mappers 1
+
+  Output:
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 02:43:50 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 02:43:50 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 02:43:50 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 02:43:50 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 02:43:50 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:43:50 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:43:50 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/d6aa49f3a60fe087b48731517f3d75ed/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 02:43:52 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/d6aa49f3a60fe087b48731517f3d75ed/order_items.jar
+18/05/04 02:43:52 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 02:43:52 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 02:43:52 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 02:43:52 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 02:43:52 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 02:43:54 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 02:43:54 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 02:43:54 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 02:44:02 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 02:44:02 INFO mapreduce.JobSubmitter: number of splits:1
+18/05/04 02:44:02 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1251
+18/05/04 02:44:03 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1251
+18/05/04 02:44:03 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1251/
+18/05/04 02:44:03 INFO mapreduce.Job: Running job: job_1525279861629_1251
+18/05/04 02:44:09 INFO mapreduce.Job: Job job_1525279861629_1251 running in uber mode : false
+18/05/04 02:44:09 INFO mapreduce.Job:  map 0% reduce 0%
+t18/05/04 02:44:18 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 02:44:19 INFO mapreduce.Job: Job job_1525279861629_1251 completed successfully
+18/05/04 02:44:19 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=159767
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters 
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=13394
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=6697
+                Total vcore-milliseconds taken by all map tasks=6697
+                Total megabyte-milliseconds taken by all map tasks=13715456
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=193
+                CPU time spent (ms)=6860
+                Physical memory (bytes) snapshot=339177472
+                Virtual memory (bytes) snapshot=3718483968
+                Total committed heap usage (bytes)=244842496
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=5408880
+18/05/04 02:44:19 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 25.5177 seconds (206.9982 KB/sec)
+18/05/04 02:44:19 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+
+
+/********************** Managing the directories ****Start**********************************/
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --num-mappers 1 
+
+Output :
+
+org.apache.hadoop.mapred.FileAlreadyExistsException: Output directory hdfs://nn01.itversity.com:8020/user/rajeshs/sqoop_import/retail_db/order_items already exists
+        at org.apache.hadoop.mapreduce.lib.output.FileOutputFormat.checkOutputSpecs(FileOutputFormat.java:146)
+
+
+        But with --delete-target-dir  it will get overriden . 
+
+
+sqoop import \
+--connect jdbc:mysql://quickstart:3306/retail_db \
+--username root \
+--password cloudera \
+--table order_items \
+--target-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+--num-mappers 1 \
+--delete-target-dir
+
+
+  Output :
+
+
+  Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 02:53:57 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 02:53:57 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 02:53:58 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 02:53:58 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 02:53:58 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:53:58 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 02:53:58 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/cf9bb14bf13473c45ba829e1934fa356/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 02:54:00 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/cf9bb14bf13473c45ba829e1934fa356/order_items.jar
+18/05/04 02:54:02 INFO tool.ImportTool: Destination directory /user/rajeshs/sqoop_import/retail_db/order_items deleted.
+18/05/04 02:54:02 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 02:54:02 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 02:54:02 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 02:54:02 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 02:54:02 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 02:54:02 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 02:54:02 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 02:54:03 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 02:54:09 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 02:54:09 INFO mapreduce.JobSubmitter: number of splits:1
+18/05/04 02:54:10 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1262
+18/05/04 02:54:10 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1262
+18/05/04 02:54:10 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1262/
+18/05/04 02:54:10 INFO mapreduce.Job: Running job: job_1525279861629_1262
+18/05/04 02:54:20 INFO mapreduce.Job: Job job_1525279861629_1262 running in uber mode : false
+18/05/04 02:54:20 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 02:54:28 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 02:54:30 INFO mapreduce.Job: Job job_1525279861629_1262 completed successfully
+18/05/04 02:54:30 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=159767
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters 
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=12874
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=6437
+                Total vcore-milliseconds taken by all map tasks=6437
+                Total megabyte-milliseconds taken by all map tasks=13182976
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=132
+                CPU time spent (ms)=6730
+                Physical memory (bytes) snapshot=336191488
+                Virtual memory (bytes) snapshot=3717914624
+                Total committed heap usage (bytes)=244842496
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=5408880
+18/05/04 02:54:30 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 28.5113 seconds (185.2636 KB/sec)
+18/05/04 02:54:30 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+
+
+
+
+
+=> append : 
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --num-mappers 1 \
+  --append
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 03:22:50 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 03:22:50 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 03:22:50 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 03:22:50 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 03:22:51 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 03:22:51 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 03:22:51 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/e56bf13dd74302cb97d5e1dce314342e/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 03:22:52 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/e56bf13dd74302cb97d5e1dce314342e/order_items.jar
+18/05/04 03:22:52 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 03:22:52 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 03:22:52 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 03:22:52 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 03:22:52 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 03:22:54 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 03:22:55 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 03:22:55 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 03:23:01 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 03:23:02 INFO mapreduce.JobSubmitter: number of splits:1
+18/05/04 03:23:02 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1295
+18/05/04 03:23:03 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1295
+18/05/04 03:23:03 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1295/
+18/05/04 03:23:03 INFO mapreduce.Job: Running job: job_1525279861629_1295
+18/05/04 03:23:10 INFO mapreduce.Job: Job job_1525279861629_1295 running in uber mode : false
+18/05/04 03:23:10 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 03:23:18 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 03:23:18 INFO mapreduce.Job: Job job_1525279861629_1295 completed successfully
+18/05/04 03:23:18 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=159784
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters 
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=10020
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=5010
+                Total vcore-milliseconds taken by all map tasks=5010
+                Total megabyte-milliseconds taken by all map tasks=10260480
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=131
+                CPU time spent (ms)=5450
+                Physical memory (bytes) snapshot=341725184
+                Virtual memory (bytes) snapshot=3715514368
+                Total committed heap usage (bytes)=239599616
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=5408880
+18/05/04 03:23:18 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 24.4755 seconds (215.8118 KB/sec)
+18/05/04 03:23:18 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+18/05/04 03:23:18 INFO util.AppendUtils: Creating missing output directory - order_items
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/sqoop_import/retail_db/order_items
+Found 1 items
+-rw-r--r--   3 rajeshs hdfs    5408880 2018-05-04 03:23 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000
+[rajeshs@gw02 ~]$ 
+
+
+/************************************  Sqoop Import - Using split by ************************************/
+
+
+
+// if a table which we want to import doesn't have primary key and you choosen to go with number of mapppers which is not one, then split logic will fail. Like example: below operation 
+
+""""18/05/04 02:15:05 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/04 02:15:05 INFO db.IntegerSplitter: Split size: 43049; Num splits: 4 from: 1 to: 172198 """
+
+
+ex: 
+
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --table order_items_nopk \
+  --warehouse-dir /user/dgadiraju/sqoop_import/retail_db \
+  --split-by order_item_order_id
+
+so sqoop cannot understand by which logic it should split the columns.(also known boundary condition)
+ In this  case , either give column name with help of "--split-by" or aviod splitting the file by giving number or mappers as 1" --num-mappers 1"
+
+rules :
+->mentioned column should be indexed.
+-> values in the field should be sparsed.
+->also often it should be sequence generated or evenly incremented.
+-> it should not be having null values in it.
+
+if sometimes tables dont have numberic field as above example 'order_item_order_id' or even with the presence of primary key and numberic field and you still want to split by non-numeric column  , then 
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table orders \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --split-by order_status
+
+
+Output :
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 05:34:57 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 05:34:57 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 05:34:57 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 05:34:57 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 05:34:57 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/04 05:34:57 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/04 05:34:57 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/221cc0c5839d76b474de6a5564f80fac/orders.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 05:34:59 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/221cc0c5839d76b474de6a5564f80fac/orders.jar
+18/05/04 05:34:59 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 05:34:59 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 05:34:59 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 05:34:59 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 05:34:59 INFO mapreduce.ImportJobBase: Beginning import of orders
+18/05/04 05:35:01 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 05:35:01 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 05:35:01 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 05:35:08 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 05:35:08 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_status`), MAX(`order_status`) FROM `orders`
+18/05/04 05:35:08 INFO mapreduce.JobSubmitter: Cleaning up the staging area /user/rajeshs/.staging/job_1525279861629_1363
+18/05/04 05:35:08 ERROR tool.ImportTool: Encountered IOException running import job: java.io.IOException: Generating splits for a textual index column allowed only in case of "-Dorg.apache.sqoop.splitter.allow_text_splitter=true" property passed as a parameter
+        at org.apache.sqoop.mapreduce.db.DataDrivenDBInputFormat.getSplits(DataDrivenDBInputFormat.java:204)
+        at org.apache.hadoop.mapreduce.JobSubmitter.writeNewSplits(JobSubmitter.java:301)
+        at org.apache.hadoop.mapreduce.JobSubmitter.writeSplits(JobSubmitter.java:318)
+        at org.apache.hadoop.mapreduce.JobSubmitter.submitJobInternal(JobSubmitter.java:196)
+        at org.apache.hadoop.mapreduce.Job$10.run(Job.java:1290)
+        at org.apache.hadoop.mapreduce.Job$10.run(Job.java:1287)
+        at java.security.AccessController.doPrivileged(Native Method)
+        at javax.security.auth.Subject.doAs(Subject.java:422)
+        at org.apache.hadoop.security.UserGroupInformation.doAs(UserGroupInformation.java:1724)
+        at org.apache.hadoop.mapreduce.Job.submit(Job.java:1287)
+        at org.apache.hadoop.mapreduce.Job.waitForCompletion(Job.java:1308)
+        at org.apache.sqoop.mapreduce.ImportJobBase.doSubmitJob(ImportJobBase.java:200)
+        at org.apache.sqoop.mapreduce.ImportJobBase.runJob(ImportJobBase.java:173)
+        at org.apache.sqoop.mapreduce.ImportJobBase.runImport(ImportJobBase.java:270)
+        at org.apache.sqoop.manager.SqlManager.importTable(SqlManager.java:692)
+        at org.apache.sqoop.manager.MySQLManager.importTable(MySQLManager.java:127)
+        at org.apache.sqoop.tool.ImportTool.importTable(ImportTool.java:507)
+        at org.apache.sqoop.tool.ImportTool.run(ImportTool.java:615)
+        at org.apache.sqoop.Sqoop.run(Sqoop.java:147)
+        at org.apache.hadoop.util.ToolRunner.run(ToolRunner.java:76)
+        at org.apache.sqoop.Sqoop.runSqoop(Sqoop.java:183)
+        at org.apache.sqoop.Sqoop.runTool(Sqoop.java:225)
+        at org.apache.sqoop.Sqoop.runTool(Sqoop.java:234)
+        at org.apache.sqoop.Sqoop.main(Sqoop.java:243)
+Caused by: Generating splits for a textual index column allowed only in case of "-Dorg.apache.sqoop.splitter.allow_text_splitter=true" property passed as a parameter
+        at org.apache.sqoop.mapreduce.db.TextSplitter.split(TextSplitter.java:67)
+        at org.apache.sqoop.mapreduce.db.DataDrivenDBInputFormat.getSplits(DataDrivenDBInputFormat.java:201)
+        ... 23 more
+
+so  below field has to set like this to execute the split by non-numeric column 
+ "-Dorg.apache.sqoop.splitter.allow_text_splitter=true " by admin team (if you use frequently)
+ under  /etc/sqoop/conf and check properties
+
+ or temporarily go with this one->
+
+
+sqoop import \
+  -Dorg.apache.sqoop.splitter.allow_text_splitter=true \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table orders \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --split-by order_status
+
+Output :
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 06:01:05 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 06:01:05 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 06:01:05 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 06:01:05 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 06:01:06 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/04 06:01:06 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/04 06:01:06 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/104491b27009d4770890fdd7bc80b787/orders.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 06:01:08 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/104491b27009d4770890fdd7bc80b787/orders.jar
+18/05/04 06:01:08 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 06:01:08 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 06:01:08 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 06:01:08 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 06:01:08 INFO mapreduce.ImportJobBase: Beginning import of orders
+18/05/04 06:01:10 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 06:01:10 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 06:01:10 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 06:01:17 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 06:01:17 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_status`), MAX(`order_status`) FROM `orders`
+18/05/04 06:01:17 WARN db.TextSplitter: Generating splits for a textual index column.
+18/05/04 06:01:17 WARN db.TextSplitter: If your database sorts in a case-insensitive order, this may result in a partial import or duplicate records.
+18/05/04 06:01:17 WARN db.TextSplitter: You are strongly encouraged to choose an integral split column.
+18/05/04 06:01:17 INFO mapreduce.JobSubmitter: number of splits:5
+18/05/04 06:01:18 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1370
+18/05/04 06:01:18 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1370
+18/05/04 06:01:18 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1370/
+18/05/04 06:01:18 INFO mapreduce.Job: Running job: job_1525279861629_1370
+18/05/04 06:01:25 INFO mapreduce.Job: Job job_1525279861629_1370 running in uber mode : false
+18/05/04 06:01:25 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 06:01:32 INFO mapreduce.Job:  map 40% reduce 0%
+18/05/04 06:01:33 INFO mapreduce.Job:  map 80% reduce 0%
+18/05/04 06:01:34 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 06:01:35 INFO mapreduce.Job: Job job_1525279861629_1370 completed successfully
+18/05/04 06:01:35 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=799205
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=736
+                HDFS: Number of bytes written=2999944
+                HDFS: Number of read operations=20
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=10
+        Job Counters 
+                Launched map tasks=5
+                Other local map tasks=5
+                Total time spent by all maps in occupied slots (ms)=40648
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=20324
+                Total vcore-milliseconds taken by all map tasks=20324
+                Total megabyte-milliseconds taken by all map tasks=41623552
+        Map-Reduce Framework
+                Map input records=68883
+                Map output records=68883
+                Input split bytes=736
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=390
+                CPU time spent (ms)=13180
+                Physical memory (bytes) snapshot=1380528128
+                Virtual memory (bytes) snapshot=18559410176
+                Total committed heap usage (bytes)=1160773632
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=2999944
+18/05/04 06:01:35 INFO mapreduce.ImportJobBase: Transferred 2.861 MB in 25.4265 seconds (115.2196 KB/sec)
+18/05/04 06:01:35 INFO mapreduce.ImportJobBase: Retrieved 68883 records.
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls -R /user/rajeshs/sqoop_import/retail_db/order_items
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/_SUCCESS
+-rw-r--r--   3 rajeshs hdfs    1322282 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/part-m-00000
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/part-m-00001
+-rw-r--r--   3 rajeshs hdfs     155533 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/part-m-00002
+-rw-r--r--   3 rajeshs hdfs    1445851 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/part-m-00003
+-rw-r--r--   3 rajeshs hdfs      76278 2018-05-04 06:01 /user/rajeshs/sqoop_import/retail_db/order_items/orders/part-m-00004
+
+splits are 5 here and everything done randomly due to non numeric field based split.
+
+
+
+
+auto reset the number of mappers to 1 when there is no primary key on the table automatically can be done by below option
+
+--autoreset-to-one-mapper
+
+"" useful when table doesn't have primary key ""
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table orders_items_nopk \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/order_items \
+  --autoreset-to-one-mapper
+
+
+create table like "orders_items_nopk " with no primary key . above is just example syntax.
+
+
+/************************************  Sqoop Import - Using split by *****END*******************************/
+
+
+
+/************************************  Sqoop Import - Different file formats *****Start*******************************/
+
+: text file is default :
+
+
+ -as-avrodatafile		Imports data to Avro Data Files   (binary json)
+--as-sequencefile		Imports data to SequenceFiles	(binary )
+--as-textfile			Imports data as plain text (default) 
+--as-parquetfile		Imports data to Parquet Files 
+
+
+Avro is a row-based storage format for Hadoop.
+Parquet is a column-based storage format for Hadoop. 
+If your use case typically scans or retrieves all of the fields in a row in each query, Avro is usually the best choice.
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --num-mappers 2 \
+  --as-sequencefile
+  
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 06:31:14 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 06:31:14 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 06:31:14 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 06:31:14 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 06:31:14 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 06:31:14 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 06:31:14 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/48c20ce6ce6d02042e96895f154d1acc/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 06:31:16 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/48c20ce6ce6d02042e96895f154d1acc/order_items.jar
+18/05/04 06:31:16 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 06:31:16 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 06:31:16 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 06:31:16 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 06:31:16 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 06:31:18 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 06:31:18 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 06:31:19 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 06:31:26 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 06:31:26 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/04 06:31:26 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/04 06:31:26 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/04 06:31:26 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1394
+18/05/04 06:31:27 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1394
+18/05/04 06:31:27 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1394/
+18/05/04 06:31:27 INFO mapreduce.Job: Running job: job_1525279861629_1394
+18/05/04 06:31:37 INFO mapreduce.Job: Job job_1525279861629_1394 running in uber mode : false
+18/05/04 06:31:37 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 06:31:43 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/04 06:31:44 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 06:31:45 INFO mapreduce.Job: Job job_1525279861629_1394 completed successfully
+18/05/04 06:31:45 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319276
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=7999492
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters 
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=15884
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=7942
+                Total vcore-milliseconds taken by all map tasks=7942
+                Total megabyte-milliseconds taken by all map tasks=16265216
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=166
+                CPU time spent (ms)=6140
+                Physical memory (bytes) snapshot=625012736
+                Virtual memory (bytes) snapshot=7429459968
+                Total committed heap usage (bytes)=477626368
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=7999492
+18/05/04 06:31:45 INFO mapreduce.ImportJobBase: Transferred 7.6289 MB in 27.9588 seconds (279.411 KB/sec)
+18/05/04 06:31:45 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+[rajeshs@gw02 ~]$ hdfs dfs -ls -R /user/rajeshs/sqoop_import/retail_db/order_items
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-04 06:31 /user/rajeshs/sqoop_import/retail_db/order_items/_SUCCESS
+-rw-r--r--   3 rajeshs hdfs    3999746 2018-05-04 06:31 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000
+-rw-r--r--   3 rajeshs hdfs    3999746 2018-05-04 06:31 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00001
+[rajeshs@gw02 ~]$ 
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -tail /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000
+B�B�P=P>��1CG�qCG�qP>P?��mB���Bo��P?P@��sB���B�P@PA���C�C�PAPB���C��qC��qPBPC��mC���Bo��PCPD��1CG�qCG�qPDPE���Cy�fBG��PEPF���C��qC��qPFPG���C�C�PGPH���C��qC��qPHPI���C��qC��qPIPJ��BW�HA���PJPK���C�BG��PKPL���CBHPLPM���C��qC��qPMPN���CG��B���PNPO��mBo��Bo��POPP���C�C�PPPQ���Cy�fBG��PQPR���C���B���PRPS���CzBH[rajeshs@gw02 ~]$ 
+
+dont run these tail commands often especially in exam environment.
+
+
+/************************************  Sqoop Import - Different file formats *****End*******************************/
+
+
+
+/************************************  Sqoop Import - Different compression algorithms *****Start*******************************/
+
+-z,--compress				Enable compression
+--compression-codec <c>		Use Hadoop codec (default gzip)
+
+//deleting dir from hdfs as it already exists from last example: 
+
+[rajeshs@gw02 ~]$ hdfs dfs -rm -R /user/rajeshs/sqoop_import/retail_db/order_items
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --num-mappers 2 \
+  --as-textfile \
+  --compress
+
+Output:
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 06:44:35 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 06:44:35 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 06:44:35 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 06:44:35 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 06:44:36 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 06:44:36 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 06:44:36 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/a88ea9943ad32cc6571f522bf7d1baaf/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 06:44:38 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/a88ea9943ad32cc6571f522bf7d1baaf/order_items.jar
+18/05/04 06:44:38 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 06:44:38 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 06:44:38 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 06:44:38 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 06:44:38 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 06:44:39 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 06:44:39 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 06:44:40 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 06:44:46 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 06:44:46 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/04 06:44:46 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/04 06:44:47 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/04 06:44:47 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1408
+18/05/04 06:44:48 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1408
+18/05/04 06:44:48 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1408/
+18/05/04 06:44:48 INFO mapreduce.Job: Running job: job_1525279861629_1408
+18/05/04 06:44:55 INFO mapreduce.Job: Job job_1525279861629_1408 running in uber mode : false
+18/05/04 06:44:55 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 06:45:02 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 06:45:03 INFO mapreduce.Job: Job job_1525279861629_1408 completed successfully
+18/05/04 06:45:04 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319520
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=1030557
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters 
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=17844
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=8922
+                Total vcore-milliseconds taken by all map tasks=8922
+                Total megabyte-milliseconds taken by all map tasks=18272256
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=166
+                CPU time spent (ms)=9970
+                Physical memory (bytes) snapshot=752107520
+                Virtual memory (bytes) snapshot=7453237248
+                Total committed heap usage (bytes)=486014976
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=1030557
+18/05/04 06:45:04 INFO mapreduce.ImportJobBase: Transferred 1,006.4033 KB in 24.8599 seconds (40.483 KB/sec)
+18/05/04 06:45:04 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+[rajeshs@gw02 ~]$ hdfs dfs -ls -R /user/rajeshs/sqoop_import/retail_db/order_items
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-04 06:45 /user/rajeshs/sqoop_import/retail_db/order_items/_SUCCESS
+-rw-r--r--   3 rajeshs hdfs     516223 2018-05-04 06:45 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000.gz
+-rw-r--r--   3 rajeshs hdfs     514334 2018-05-04 06:45 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00001.gz
+[rajeshs@gw02 ~]$ 
+
+as they are in binary files we cant view the files.
+if you want to view the gzip files then you have to download the file to local filesystem and use gunzip <filename>
+
+[rajeshs@gw02 order_items]$ ls -d */             (to list only directories)
+cd order_items
+[rajeshs@gw02 order_items]$ hdfs dfs -get /user/rajeshs/sqoop_import/retail_db/order_items order_items
+[rajeshs@gw02 order_items]$ ls -l
+total 5288
+-rw-r--r-- 1 rajeshs students 2647040 May  4 06:57 part-m-00000
+-rw-r--r-- 1 rajeshs students 2761840 May  4 06:57 part-m-00001
+-rw-r--r-- 1 rajeshs students       0 May  4 06:57 _SUCCESS
+[rajeshs@gw02 order_items]$ pwd
+/home/rajeshs/order_items
+[rajeshs@gw02 order_items]$ cat part-m-00000
+1,1,957,1,299.98,299.98
+2,2,1073,1,199.99,199.99
+3,2,502,5,250.0,50.0
+4,2,403,1,129.99,129.99
+.......................
+
+clearing the data now :
+[rajeshs@gw02 ~]$ hdfs dfs -rm -R /user/rajeshs/sqoop_import/retail_db/*
+18/05/04 07:05:34 INFO fs.TrashPolicyDefault: Moved: 'hdfs://nn01.itversity.com:8020/user/rajeshs/sqoop_import/retail_db/order_items' to trash at: hdfs://nn01.itversity.com:8020/user/rajeshs/.Trash/Current/user/rajeshs/sqoop_import/retail_db/order_items1525431934717
+
+
+above example is showing only default gzip comperession.
+
+if you want to use other than gzip , then check below configuration. where you can check available compression algorithms.
+
+[rajeshs@gw02 ~]$ cd /etc/hadoop/conf
+[rajeshs@gw02 conf]$ cat core-site.xml 
+......
+ <property>
+      <name>io.compression.codecs</name>
+      <value>org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.SnappyCodec</value>
+    </property>
+
+    .......
+
+if you want to add new compression algorithm to codecs ,check with admin team . supply them appropriate jar file location and add it in codecs list. these two steps are mandatory.
+
+
+
+example:
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --num-mappers 2 \
+  --as-textfile \
+  --compress \
+  --compression-codec org.apache.hadoop.io.compress.SnappyCodec
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 07:12:40 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 07:12:40 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 07:12:40 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 07:12:40 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 07:12:41 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 07:12:41 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 07:12:41 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/53a3ef9d8de98a9b45f5fb7bd350416e/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 07:12:43 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/53a3ef9d8de98a9b45f5fb7bd350416e/order_items.jar
+18/05/04 07:12:43 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 07:12:43 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 07:12:43 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 07:12:43 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 07:12:43 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 07:12:45 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 07:12:45 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 07:12:46 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 07:12:53 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 07:12:53 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/04 07:12:53 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/04 07:12:53 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/04 07:12:53 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1422
+18/05/04 07:12:54 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1422
+18/05/04 07:12:54 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1422/
+18/05/04 07:12:54 INFO mapreduce.Job: Running job: job_1525279861629_1422
+18/05/04 07:13:00 INFO mapreduce.Job: Job job_1525279861629_1422 running in uber mode : false
+18/05/04 07:13:00 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 07:13:07 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/04 07:14:01 INFO mapreduce.Job: Task Id : attempt_1525279861629_1422_m_000000_0, Status : FAILED
+Container launch failed for container_e28_1525279861629_1422_01_000002 : java.net.NoRouteToHostException: No Route to Host from  wn02.itversity.com/172.16.1.103 to wn06.itversity.com:45454 failed on socket timeout exception: java.net.NoRouteToHostException: No route to host; For more details see:  http://wiki.apache.org/hadoop/NoRouteToHost
+        at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+        at sun.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+        at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+        at java.lang.reflect.Constructor.newInstance(Constructor.java:423)
+        at org.apache.hadoop.net.NetUtils.wrapWithMessage(NetUtils.java:801)
+        at org.apache.hadoop.net.NetUtils.wrapException(NetUtils.java:758)
+        at org.apache.hadoop.ipc.Client.getRpcResponse(Client.java:1556)
+        at org.apache.hadoop.ipc.Client.call(Client.java:1496)
+        at org.apache.hadoop.ipc.Client.call(Client.java:1396)
+        at org.apache.hadoop.ipc.ProtobufRpcEngine$Invoker.invoke(ProtobufRpcEngine.java:233)
+        at com.sun.proxy.$Proxy81.startContainers(Unknown Source)
+        at org.apache.hadoop.yarn.api.impl.pb.client.ContainerManagementProtocolPBClientImpl.startContainers(ContainerManagementProtocolPBClientImpl.java:96)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.apache.hadoop.io.retry.RetryInvocationHandler.invokeMethod(RetryInvocationHandler.java:278)
+        at org.apache.hadoop.io.retry.RetryInvocationHandler.invoke(RetryInvocationHandler.java:194)
+        at org.apache.hadoop.io.retry.RetryInvocationHandler.invoke(RetryInvocationHandler.java:176)
+        at com.sun.proxy.$Proxy82.startContainers(Unknown Source)
+        at org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncherImpl$Container.launch(ContainerLauncherImpl.java:151)
+        at org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncherImpl$EventProcessor.run(ContainerLauncherImpl.java:375)
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+        at java.lang.Thread.run(Thread.java:745)
+Caused by: java.net.NoRouteToHostException: No route to host
+        at sun.nio.ch.SocketChannelImpl.checkConnect(Native Method)
+        at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:717)
+        at org.apache.hadoop.net.SocketIOWithTimeout.connect(SocketIOWithTimeout.java:206)
+        at org.apache.hadoop.net.NetUtils.connect(NetUtils.java:531)
+        at org.apache.hadoop.net.NetUtils.connect(NetUtils.java:495)
+        at org.apache.hadoop.ipc.Client$Connection.setupConnection(Client.java:650)
+        at org.apache.hadoop.ipc.Client$Connection.setupIOstreams(Client.java:745)
+        at org.apache.hadoop.ipc.Client$Connection.access$3200(Client.java:397)
+        at org.apache.hadoop.ipc.Client.getConnection(Client.java:1618)
+        at org.apache.hadoop.ipc.Client.call(Client.java:1449)
+        ... 17 more
+
+18/05/04 07:14:07 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 07:14:08 INFO mapreduce.Job: Job job_1525279861629_1422 completed successfully
+18/05/04 07:14:08 INFO mapreduce.Job: Counters: 31
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319524
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=1826450
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters 
+                Failed map tasks=1
+                Launched map tasks=3
+                Other local map tasks=3
+                Total time spent by all maps in occupied slots (ms)=16444
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=8222
+                Total vcore-milliseconds taken by all map tasks=8222
+                Total megabyte-milliseconds taken by all map tasks=16838656
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=155
+                CPU time spent (ms)=6980
+                Physical memory (bytes) snapshot=651186176
+                Virtual memory (bytes) snapshot=7438168064
+                Total committed heap usage (bytes)=488112128
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=1826450
+18/05/04 07:14:08 INFO mapreduce.ImportJobBase: Transferred 1.7418 MB in 83.8841 seconds (21.2632 KB/sec)
+18/05/04 07:14:08 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+
+ [rajeshs@gw02 ~]$ hdfs dfs -ls -R /user/rajeshs/sqoop_import/retail_db/order_items
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-04 07:14 /user/rajeshs/sqoop_import/retail_db/order_items
+-rw-r--r--   3 rajeshs hdfs          0 2018-05-04 07:14 /user/rajeshs/sqoop_import/retail_db/order_items/_SUCCESS
+-rw-r--r--   3 rajeshs hdfs     916268 2018-05-04 07:14 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000.snappy
+-rw-r--r--   3 rajeshs hdfs     910182 2018-05-04 07:13 /user/rajeshs/sqoop_import/retail_db/order_items/part-m-00001.snappy
+
+
+/************************************  Sqoop Import - Different compression algorithms *****End*******************************/
+
+
+
+/************************************  43. Sqoop Import - Using Boundary Query *****Start*******************************/
+
+using a simple import here ;
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/
+
+18/05/04 07:44:12 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+
+above one called as boundary query .
+
+if you already know what is the min value and what is max value, 
+or if you want to hardcode/customize the query using --boundary-query.
+
+
+1) 
+Customizing the query to list only 5 digits order ids. 
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --boundary-query 'SELECT MIN(order_item_id), MAX(order_item_id) FROM order_items where order_item_id > 9999'
+
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 08:42:39 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 08:42:39 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 08:42:39 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 08:42:39 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 08:42:40 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 08:42:40 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 08:42:40 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/1a3b492632dad177f98676ffba3fdbd7/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 08:42:42 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/1a3b492632dad177f98676ffba3fdbd7/order_items.jar
+18/05/04 08:42:42 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 08:42:42 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 08:42:42 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 08:42:42 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 08:42:42 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 08:42:42 WARN db.DataDrivenDBInputFormat: Could not find $CONDITIONS token in query: SELECT MIN(order_item_id), MAX(order_item_id) FROM order_items where order_item_id > 9999; splits may not partition data.
+18/05/04 08:42:44 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 08:42:44 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 08:42:44 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 08:42:51 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 08:42:51 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(order_item_id), MAX(order_item_id) FROM order_items where order_item_id > 9999
+18/05/04 08:42:51 INFO db.IntegerSplitter: Split size: 40549; Num splits: 4 from: 10000 to: 172198
+18/05/04 08:42:51 INFO mapreduce.JobSubmitter: number of splits:4
+18/05/04 08:42:51 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1460
+18/05/04 08:42:52 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1460
+18/05/04 08:42:52 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1460/
+18/05/04 08:42:52 INFO mapreduce.Job: Running job: job_1525279861629_1460
+18/05/04 08:42:57 INFO mapreduce.Job: Job job_1525279861629_1460 running in uber mode : false
+18/05/04 08:42:57 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 08:43:03 INFO mapreduce.Job:  map 25% reduce 0%
+18/05/04 08:43:04 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/04 08:43:05 INFO mapreduce.Job:  map 75% reduce 0%
+18/05/04 08:43:06 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 08:43:07 INFO mapreduce.Job: Job job_1525279861629_1460 completed successfully
+18/05/04 08:43:07 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=640004
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=516
+                HDFS: Number of bytes written=5120894
+                HDFS: Number of read operations=16
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=8
+        Job Counters 
+                Launched map tasks=4
+                Other local map tasks=4
+                Total time spent by all maps in occupied slots (ms)=39238
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=19619
+                Total vcore-milliseconds taken by all map tasks=19619
+                Total megabyte-milliseconds taken by all map tasks=40179712
+        Map-Reduce Framework
+                Map input records=162199
+                Map output records=162199
+                Input split bytes=516
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=437
+                CPU time spent (ms)=14090
+                Physical memory (bytes) snapshot=1307406336
+                Virtual memory (bytes) snapshot=14878740480
+                Total committed heap usage (bytes)=986185728
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=5120894
+18/05/04 08:43:07 INFO mapreduce.ImportJobBase: Transferred 4.8837 MB in 23.7355 seconds (210.692 KB/sec)
+18/05/04 08:43:07 INFO mapreduce.ImportJobBase: Retrieved 162199 records.
+
+
+2) hardcoding the range of values:
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --boundary-query 'select 1,10000'
+
+  Output:
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/04 08:46:55 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/04 08:46:55 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/04 08:46:55 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/04 08:46:55 INFO tool.CodeGenTool: Beginning code generation
+18/05/04 08:46:55 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 08:46:55 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/04 08:46:55 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/20c2800f9be26dd850d7878357ba5adb/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/04 08:46:57 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/20c2800f9be26dd850d7878357ba5adb/order_items.jar
+18/05/04 08:46:57 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/04 08:46:57 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/04 08:46:57 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/04 08:46:57 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/04 08:46:57 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/04 08:46:58 WARN db.DataDrivenDBInputFormat: Could not find $CONDITIONS token in query: select 1,10000; splits may not partition data.
+18/05/04 08:46:59 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/04 08:46:59 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/04 08:46:59 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/04 08:47:06 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/04 08:47:06 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: select 1,10000
+18/05/04 08:47:06 INFO db.IntegerSplitter: Split size: 2499; Num splits: 4 from: 1 to: 10000
+18/05/04 08:47:06 INFO mapreduce.JobSubmitter: number of splits:4
+18/05/04 08:47:07 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_1462
+18/05/04 08:47:07 INFO impl.YarnClientImpl: Submitted application application_1525279861629_1462
+18/05/04 08:47:07 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_1462/
+18/05/04 08:47:07 INFO mapreduce.Job: Running job: job_1525279861629_1462
+18/05/04 08:47:15 INFO mapreduce.Job: Job job_1525279861629_1462 running in uber mode : false
+18/05/04 08:47:15 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/04 08:47:22 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/04 08:47:23 INFO mapreduce.Job:  map 75% reduce 0%
+18/05/04 08:47:25 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/04 08:47:26 INFO mapreduce.Job: Job job_1525279861629_1462 completed successfully
+18/05/04 08:47:26 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=639676
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=503
+                HDFS: Number of bytes written=288018
+                HDFS: Number of read operations=16
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=8
+        Job Counters 
+                Launched map tasks=4
+                Other local map tasks=4
+                Total time spent by all maps in occupied slots (ms)=32694
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=16347
+                Total vcore-milliseconds taken by all map tasks=16347
+                Total megabyte-milliseconds taken by all map tasks=33478656
+        Map-Reduce Framework
+                Map input records=10000
+                Map output records=10000
+                Input split bytes=503
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=268
+                CPU time spent (ms)=7060
+                Physical memory (bytes) snapshot=1024692224
+                Virtual memory (bytes) snapshot=14835269632
+                Total committed heap usage (bytes)=916455424
+        File Input Format Counters 
+                Bytes Read=0
+        File Output Format Counters 
+                Bytes Written=288018
+18/05/04 08:47:26 INFO mapreduce.ImportJobBase: Transferred 281.2676 KB in 27.4346 seconds (10.2523 KB/sec)
+18/05/04 08:47:26 INFO mapreduce.ImportJobBase: Retrieved 10000 records.
+
+/************************************  43. Sqoop Import - Using Boundary Query *****End*******************************/
+
+
+
+
+
+
+/************************************  44. Sqoop Import - columns and query    *****Start*******************************/
+
+
+columns or query -> for subset of columns
+tables -> for entire table data
+
+columns or query <-> tables	are mutually exclusive
+
+\\  --columns <col1,col2,col3..> no spaces between col1,col..etc
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --columns order_item_order_id,order_item_id,order_item_subtotal \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db \
+  --num-mappers 2
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/06 09:45:32 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/06 09:45:32 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/06 09:45:32 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/06 09:45:32 INFO tool.CodeGenTool: Beginning code generation
+18/05/06 09:45:34 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/06 09:45:34 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/06 09:45:34 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/287840c69bdb8621fc47f0ae8f0cc3aa/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/06 09:45:36 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/287840c69bdb8621fc47f0ae8f0cc3aa/order_items.jar
+18/05/06 09:45:36 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/06 09:45:36 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/06 09:45:36 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/06 09:45:36 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/06 09:45:36 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/06 09:45:39 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/06 09:45:39 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/06 09:45:40 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/06 09:45:47 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/06 09:45:47 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/06 09:45:47 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/06 09:45:47 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/06 09:45:47 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2612
+18/05/06 09:45:48 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2612
+18/05/06 09:45:48 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2612/
+18/05/06 09:45:48 INFO mapreduce.Job: Running job: job_1525279861629_2612
+18/05/06 09:45:55 INFO mapreduce.Job: Job job_1525279861629_2612 running in uber mode : false
+18/05/06 09:45:55 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/06 09:46:02 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/06 09:46:03 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/06 09:46:03 INFO mapreduce.Job: Task Id : attempt_1525279861629_2612_m_000001_0, Status : FAILED
+Container killed on request. Exit code is 137
+Container exited with a non-zero exit code 137
+Killed by external signal
+
+18/05/06 09:46:04 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/06 09:46:10 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/06 09:46:12 INFO mapreduce.Job: Job job_1525279861629_2612 completed successfully
+18/05/06 09:46:12 INFO mapreduce.Job: Counters: 31
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319388
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=3245187
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Failed map tasks=1
+                Launched map tasks=3
+                Other local map tasks=3
+                Total time spent by all maps in occupied slots (ms)=31166
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=15583
+                Total vcore-milliseconds taken by all map tasks=15583
+                Total megabyte-milliseconds taken by all map tasks=31913984
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=175
+                CPU time spent (ms)=9210
+                Physical memory (bytes) snapshot=639447040
+                Virtual memory (bytes) snapshot=7426641920
+                Total committed heap usage (bytes)=494403584
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=3245187
+18/05/06 09:46:12 INFO mapreduce.ImportJobBase: Transferred 3.0949 MB in 33.9902 seconds (93.2366 KB/sec)
+18/05/06 09:46:12 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --table order_items \
+  --columns order_item_subtotal,order_item_order_id,order_item_id \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db \
+  --num-mappers 2
+
+
+
+
+select o.order_id,sum(oi.order_item_subtotal)  subtotal from
+     orders o join order_items oi
+   on o.order_id =oi.order_item_order_id group by  o.order_id,o.order_date,o.order_customer_id,o.order_status
+   order by subtotal desc;
+MySQL [retail_db]> select o.order_id,sum(oi.order_item_subtotal)  subtotal from
+    ->      orders o join order_items oi
+    ->    on o.order_id =oi.order_item_order_id group by  o.order_id,o.order_date,o.order_customer_id,o.order_status;
++----------+--------------------+
+| order_id | subtotal           |
++----------+--------------------+
+|        1 |  299.9800109863281 |
+|        2 |  579.9800109863281 |
+|        4 |  699.8500099182129 |
+|        5 | 1129.8600387573242 |
+|        7 |  579.9200134277344 |
+|        8 |  729.8400115966797 |
+|        9 |  599.9600067138672 |
+|       10 |   651.920015335083 |
+|       11 |  919.7899932861328 |
+|       12 | 1299.8700256347656 |
+|       13 | 127.95999908447266 |
+............................................
+
+MySQL [retail_db]> select o.order_id,sum(oi.order_item_subtotal)  subtotal from
+    ->      orders o join order_items oi
+    ->    on o.order_id =oi.order_item_order_id group by  o.order_id,o.order_date,o.order_customer_id,o.order_status
+    ->    order by subtotal desc;
++----------+--------------------+
+| order_id | subtotal           |
++----------+--------------------+
+|    68703 | 3449.9099884033203 |
+|    68724 | 2859.8900032043457 |
+|    68858 | 2839.9100036621094 |
+|    68809 | 2779.8600006103516 |
+|    68766 |  2699.899990081787 |
+|    68821 | 2629.9200134277344 |
+|    68806 | 2629.9200134277344 |
+|    68778 | 2629.8999938964844 |
+|    68848 |  2399.959991455078 |
+
+
+ select o.*,sum(oi.order_item_subtotal)  subtotal from
+          orders o join order_items oi
+        on o.order_id =oi.order_item_order_id group by  o.order_id,o.order_date,o.order_customer_id,o.order_status;
+
+57431 rows in set (0.44 sec)
+
+sqoop import \
+--connect jdbc:mysql://quickstart:3306/retail_db \
+--username root \
+--password cloudera \
+--warehouse-dir /user/rajeshs/sqoop_import/retail_db \
+--query 'select o.*,sum(oi.order_item_subtotal)  subtotal from 
+          orders o join order_items oi
+        on o.order_id =oi.order_item_order_id group by  o.order_id,o.order_date,o.order_customer_id,o.order_status'
+
+
+sqoop import \
+  --connect jdbc:mysql://quickstart:3306/retail_db \
+  --username root \
+  --password cloudera \
+  --target-dir /user/rajeshs/sqoop_import/retail_db\orders_with_revenue \
+  --num-mappers 2 \
+  --query "select o.*,sum(oi.order_item_subtotal)  subtotal from \
+          orders o join order_items oi \
+        on o.order_id =oi.order_item_order_id and \$CONDITIONS group by \
+        o.order_id,o.order_date,o.order_customer_id,o.order_status" \
+  --split-by order_id
+
+ (  1) when you use --query , you should use target-dir instead of warehouse-dir because , warehouse-dir cannot figure out with which table name the directory should be created. for that reason use target-dir with fully qualified directory path
+    2) a placeholder $CONDITIONS is must when you use --query
+
+    3) --split by  is must when you use --query , if num-mappers are greater than 1
+ )
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/06 10:26:13 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/06 10:26:13 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/06 10:26:14 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/06 10:26:14 INFO tool.CodeGenTool: Beginning code generation
+18/05/06 10:26:15 INFO manager.SqlManager: Executing SQL statement: select o.*,sum(oi.order_item_subtotal)  subtotal from           orders o join order_items oi         on o.order_id =oi.order_item_order_id and  (1 = 0)  group by         o.order_id,o.order_date,o.order_customer_id,o.order_status
+18/05/06 10:26:15 INFO manager.SqlManager: Executing SQL statement: select o.*,sum(oi.order_item_subtotal)  subtotal from           orders o join order_items oi         on o.order_id =oi.order_item_order_id and  (1 = 0)  group by         o.order_id,o.order_date,o.order_customer_id,o.order_status
+18/05/06 10:26:15 INFO manager.SqlManager: Executing SQL statement: select o.*,sum(oi.order_item_subtotal)  subtotal from           orders o join order_items oi         on o.order_id =oi.order_item_order_id and  (1 = 0)  group by         o.order_id,o.order_date,o.order_customer_id,o.order_status
+18/05/06 10:26:15 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/d0bf0b155794915d7a058b7638accbab/QueryResult.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/06 10:26:17 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/d0bf0b155794915d7a058b7638accbab/QueryResult.jar
+18/05/06 10:26:17 INFO mapreduce.ImportJobBase: Beginning query import.
+18/05/06 10:26:19 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/06 10:26:19 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/06 10:26:19 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/06 10:26:27 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/06 10:26:27 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(order_id), MAX(order_id) FROM (select o.*,sum(oi.order_item_subtotal)  subtotal from           orders o join order_items oi         on o.order_id =oi.order_item_order_id and  (1 = 1)  group by         o.order_id,o.order_date,o.order_customer_id,o.order_status) AS t1
+18/05/06 10:26:27 INFO db.IntegerSplitter: Split size: 34441; Num splits: 2 from: 1 to: 68883
+18/05/06 10:26:28 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/06 10:26:28 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2629
+18/05/06 10:26:29 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2629
+18/05/06 10:26:29 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2629/
+18/05/06 10:26:29 INFO mapreduce.Job: Running job: job_1525279861629_2629
+18/05/06 10:26:37 INFO mapreduce.Job: Job job_1525279861629_2629 running in uber mode : false
+18/05/06 10:26:37 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/06 10:26:43 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/06 10:26:45 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/06 10:26:46 INFO mapreduce.Job: Job job_1525279861629_2629 completed successfully
+18/05/06 10:26:46 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=320186
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=225
+                HDFS: Number of bytes written=3526062
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=19836
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=9918
+                Total vcore-milliseconds taken by all map tasks=9918
+                Total megabyte-milliseconds taken by all map tasks=20312064
+        Map-Reduce Framework
+                Map input records=57431
+                Map output records=57431
+                Input split bytes=225
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=123
+                CPU time spent (ms)=9620
+                Physical memory (bytes) snapshot=675983360
+                Virtual memory (bytes) snapshot=7437737984
+                Total committed heap usage (bytes)=492306432
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=3526062
+18/05/06 10:26:46 INFO mapreduce.ImportJobBase: Transferred 3.3627 MB in 27.5586 seconds (124.9492 KB/sec)
+18/05/06 10:26:46 INFO mapreduce.ImportJobBase: Retrieved 57431 records.
+
+
+/************************************  44. Sqoop Import - columns and query    *****End*******************************/
+
+
+
+
+
+/************************************  45. Sqoop Import - Delimiters and handling nulls ***Start*******************************/
+
+ 
+
+ --> ms.itversity.com is the hostname for hr_user database
+
+  mysql -u hr_user -h ms.itversity.com -p
+
+  Argument						 Description
+--enclosed-by <char>			 Sets a required field enclosing character
+--escaped-by <char>				 Sets the escape character
+--fields-terminated-by <char>	 Sets the field separator character
+--lines-terminated-by <char>	 Sets the end-of-line character
+--mysql-delimiters				 Uses MySQL’s default delimiter set: fields: , lines: \n escaped-by: \ optionally-enclosed-by: '
+--optionally-enclosed-by <char>	 Sets a field enclosing character
+
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/hr_db \
+  ----username hr_useoptionally-enclosed-by'
+
+  --password cloudera \
+  --table employees \
+  --warehouse-dir /user/rajeshs/sqoop_import/hr_db
+  
+#Changing default delimiters and nulls
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/hr_db \
+  --username hr_user \
+  --password cloudera \
+  --table employees \
+  --warehouse-dir /user/rajeshs/sqoop_import/hr_db \
+  --null-non-string -1 \
+  --fields-terminated-by "\000" \
+  --lines-terminated-by "\\n" \
+  --delete-target-dir
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/07 03:36:26 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/07 03:36:26 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/07 03:36:26 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/07 03:36:26 INFO tool.CodeGenTool: Beginning code generation
+18/05/07 03:36:27 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `employees` AS t LIMIT 1
+18/05/07 03:36:27 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `employees` AS t LIMIT 1
+18/05/07 03:36:27 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/b13e0122a491dbd66177f62256f4ee0d/employees.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/07 03:36:29 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/b13e0122a491dbd66177f62256f4ee0d/employees.jar
+18/05/07 03:36:31 INFO tool.ImportTool: Destination directory /user/rajeshs/sqoop_import/hr_db/employees deleted.
+18/05/07 03:36:31 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/07 03:36:31 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/07 03:36:31 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/07 03:36:31 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/07 03:36:31 INFO mapreduce.ImportJobBase: Beginning import of employees
+18/05/07 03:36:32 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/07 03:36:32 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/07 03:36:32 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/07 03:36:39 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/07 03:36:39 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`employee_id`), MAX(`employee_id`) FROM `employees`
+18/05/07 03:36:39 INFO db.IntegerSplitter: Split size: 26; Num splits: 4 from: 100 to: 206
+18/05/07 03:36:40 INFO mapreduce.JobSubmitter: number of splits:4
+18/05/07 03:36:40 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2941
+18/05/07 03:36:41 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2941
+18/05/07 03:36:41 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2941/
+18/05/07 03:36:41 INFO mapreduce.Job: Running job: job_1525279861629_2941
+18/05/07 03:36:48 INFO mapreduce.Job: Job job_1525279861629_2941 running in uber mode : false
+18/05/07 03:36:48 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/07 03:36:53 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/07 03:36:55 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/07 03:36:56 INFO mapreduce.Job: Job job_1525279861629_2941 completed successfully
+18/05/07 03:36:56 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=638996
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=481
+                HDFS: Number of bytes written=8400
+                HDFS: Number of read operations=16
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=8
+        Job Counters
+                Launched map tasks=4
+                Other local map tasks=4
+                Total time spent by all maps in occupied slots (ms)=30112
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=15056
+                Total vcore-milliseconds taken by all map tasks=15056
+                Total megabyte-milliseconds taken by all map tasks=30834688
+        Map-Reduce Framework
+                Map input records=107
+                Map output records=107
+                Input split bytes=481
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=265
+                CPU time spent (ms)=5430
+                Physical memory (bytes) snapshot=964497408
+                Virtual memory (bytes) snapshot=14853468160
+                Total committed heap usage (bytes)=881328128
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=8400
+18/05/07 03:36:56 INFO mapreduce.ImportJobBase: Transferred 8.2031 KB in 24.9292 seconds (336.9545 bytes/sec)
+18/05/07 03:36:56 INFO mapreduce.ImportJobBase: Retrieved 107 records.
+
+
+format output: for above one is 
+127JamesLandryJLANDRY650.124.13341999-01-14ST_CLERK2400.00-112050
+128StevenMarkleSMARKLE650.124.14342000-03-08ST_CLERK2200.00-112050
+129LauraBissotLBISSOT650.124.52341997-08-20ST_CLERK3300.00-112150
+130MozheAtkinsonMATKINSO650.124.62341997-10-30ST_CLERK2800.00-112150
+131JamesMarlowJAMRLOW650.124.72341997-02-16ST_CLERK2500.00-112150
+132TJOlsonTJOLSON650.124.82341999-04-10ST_CLERK2100.00-112150
+
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/hr_db \
+  --username hr_user \
+  --password cloudera \
+  --table employees \
+  --warehouse-dir /user/rajeshs/sqoop_import/hr_db \
+  --null-non-string -1 \
+  --fields-terminated-by "\t" \
+  --lines-terminated-by "\\n" \
+  --delete-target-dir
+
+/************************************  45. Sqoop Import - Delimiters and handling nulls  ****End*******************************/
+
+
+
+/************************************  46. Sqoop Import - Incremental Loads  ****Start*******************************/
+# 1 Baseline import
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/orders \
+  --num-mappers 2 \
+  --query "select * from orders where \$CONDITIONS and order_date like '2013-%'" \
+  --split-by order_id
+Output log:
+18/05/07 04:33:30 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319500
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=225
+                HDFS: Number of bytes written=1329173
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=19354
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=9677
+                Total vcore-milliseconds taken by all map tasks=9677
+                Total megabyte-milliseconds taken by all map tasks=19818496
+        Map-Reduce Framework
+                Map input records=30662
+                Map output records=30662
+                Input split bytes=225
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=152
+                CPU time spent (ms)=6210
+                Physical memory (bytes) snapshot=541720576
+                Virtual memory (bytes) snapshot=7436169216
+                Total committed heap usage (bytes)=470810624
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=1329173
+18/05/07 04:33:30 INFO mapreduce.ImportJobBase: Transferred 1.2676 MB in 24.0604 seconds (53.9484 KB/sec)
+18/05/07 04:33:30 INFO mapreduce.ImportJobBase: Retrieved 30662 records.
+
+
+
+
+# 2 Query can be used to load data based on condition
+
+Appending 2014 jan data to above loaded data:
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/orders \
+  --num-mappers 2 \
+  --query "select * from orders where \$CONDITIONS and order_date like '2014-01%'" \
+  --split-by order_id \
+  --append
+
+
+by using --query , we have to use split-by . it will be difficult if we have more number of tables to be joined.
+for this reason we use "where" option, where we can still use the table.
+
+# 3  where in conjunction with table can be used to get data based up on a condition
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/orders \
+  --num-mappers 2 \
+  --table orders \
+  --where "order_date like '2014-02%'" \
+  --append
+
+18/05/07 04:41:12 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319694
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=237
+                HDFS: Number of bytes written=246132
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=13054
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=6527
+                Total vcore-milliseconds taken by all map tasks=6527
+                Total megabyte-milliseconds taken by all map tasks=13367296
+        Map-Reduce Framework
+                Map input records=5635
+                Map output records=5635
+                Input split bytes=237
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=87
+                CPU time spent (ms)=3350
+                Physical memory (bytes) snapshot=490323968
+                Virtual memory (bytes) snapshot=7439454208
+                Total committed heap usage (bytes)=438829056
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=246132
+18/05/07 04:41:12 INFO mapreduce.ImportJobBase: Transferred 240.3633 KB in 21.675 seconds (11.0894 KB/sec)
+18/05/07 04:41:12 INFO mapreduce.ImportJobBase: Retrieved 5635 records.
+18/05/07 04:41:12 INFO util.AppendUtils: Appending to directory orders
+18/05/07 04:41:12 INFO util.AppendUtils: Using found partition 4
+
+
+
+# 4  Incremental load using arguments specific to incremental load
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --target-dir /user/rajeshs/sqoop_import/retail_db/orders \
+  --num-mappers 2 \
+  --table orders \
+  --check-column order_date \
+  --incremental append \
+  --last-value '2014-02-28'
+
+
+
+
+Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/07 04:48:39 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/07 04:48:39 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/07 04:48:39 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/07 04:48:39 INFO tool.CodeGenTool: Beginning code generation
+18/05/07 04:48:40 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/07 04:48:40 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `orders` AS t LIMIT 1
+18/05/07 04:48:40 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/844a020e663337db7acc4013f7054184/orders.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/07 04:48:42 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/844a020e663337db7acc4013f7054184/orders.jar
+18/05/07 04:48:43 INFO tool.ImportTool: Maximal id query for free form incremental import: SELECT MAX(`order_date`) FROM `orders`
+18/05/07 04:48:43 INFO tool.ImportTool: Incremental import based on column `order_date`
+18/05/07 04:48:43 INFO tool.ImportTool: Lower bound value: '2014-02-28'
+18/05/07 04:48:43 INFO tool.ImportTool: Upper bound value: '2014-07-24 00:00:00.0'
+18/05/07 04:48:43 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/07 04:48:43 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/07 04:48:43 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/07 04:48:43 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/07 04:48:43 INFO mapreduce.ImportJobBase: Beginning import of orders
+18/05/07 04:48:44 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/07 04:48:44 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/07 04:48:44 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/07 04:48:50 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/07 04:48:50 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_id`), MAX(`order_id`) FROM `orders` WHERE ( `order_date` > '2014-02-28' AND `order_date` <= '2014-07-24 00:00:00.0' )
+18/05/07 04:48:50 INFO db.IntegerSplitter: Split size: 16667; Num splits: 2 from: 35549 to: 68883
+18/05/07 04:48:51 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/07 04:48:51 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2976
+18/05/07 04:48:51 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2976
+18/05/07 04:48:51 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2976/
+18/05/07 04:48:51 INFO mapreduce.Job: Running job: job_1525279861629_2976
+18/05/07 04:49:01 INFO mapreduce.Job: Job job_1525279861629_2976 running in uber mode : false
+18/05/07 04:49:01 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/07 04:49:07 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/07 04:49:08 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/07 04:49:09 INFO mapreduce.Job: Job job_1525279861629_2976 completed successfully
+18/05/07 04:49:09 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319796
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=237
+                HDFS: Number of bytes written=1166050
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=15930
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=7965
+                Total vcore-milliseconds taken by all map tasks=7965
+                Total megabyte-milliseconds taken by all map tasks=16312320
+        Map-Reduce Framework
+                Map input records=26678
+                Map output records=26678
+                Input split bytes=237
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=92
+                CPU time spent (ms)=4290
+                Physical memory (bytes) snapshot=535388160
+                Virtual memory (bytes) snapshot=7448502272
+                Total committed heap usage (bytes)=444071936
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=1166050
+18/05/07 04:49:09 INFO mapreduce.ImportJobBase: Transferred 1.112 MB in 25.6289 seconds (44.4311 KB/sec)
+18/05/07 04:49:09 INFO mapreduce.ImportJobBase: Retrieved 26678 records.
+18/05/07 04:49:09 INFO util.AppendUtils: Appending to directory orders
+18/05/07 04:49:09 INFO util.AppendUtils: Using found partition 6
+18/05/07 04:49:09 INFO tool.ImportTool: Incremental import complete! To run another incremental import of all data following this import, supply the following arguments:
+18/05/07 04:49:09 INFO tool.ImportTool:  --incremental append
+18/05/07 04:49:09 INFO tool.ImportTool:   --check-column order_date
+18/05/07 04:49:09 INFO tool.ImportTool:   --last-value 2014-07-24 00:00:00.0
+18/05/07 04:49:09 INFO tool.ImportTool: (Consider saving this with 'sqoop job --create')
+
+
+/************************************  46. Sqoop Import - Incremental Loads  ****End*******************************/
+
+/************************************ 47. Sqoop Import - Hive - Create Hive Database****Start*******************************/
+
+
+[rajeshs@gw02 ~]$ hive
+
+Logging initialized using configuration in file:/etc/hive/2.5.0.0-1245/0/hive-log4j.properties
+hive (default)> create database rajeshs_sqoop_import;
+
+OK
+Time taken: 2.066 seconds
+hive (default)> use rajeshs_sqoop_import;
+
+OK
+Time taken: 0.233 seconds
+hive (rajeshs_sqoop_import)>
+hive (rajeshs_sqoop_import)> create table t (i int);
+
+OK
+Time taken: 0.561 seconds
+hive (rajeshs_sqoop_import)> insert into table t values(1);
+
+Query ID = rajeshs_20180507045923_8ef381e0-66b3-4ca6-9109-0b6f85a50134
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks is set to 0 since there's no reduce operator
+Starting Job = job_1525279861629_2981, Tracking URL = http://rm01.itversity.com:19288/proxy/application_1525279861629_2981/
+Kill Command = /usr/hdp/2.5.0.0-1245/hadoop/bin/hadoop job  -kill job_1525279861629_2981
+Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 0
+2018-05-07 04:59:33,163 Stage-1 map = 0%,  reduce = 0%
+2018-05-07 04:59:37,375 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 2.38 sec
+MapReduce Total cumulative CPU time: 2 seconds 380 msec
+Ended Job = job_1525279861629_2981
+Stage-4 is selected by condition resolver.
+Stage-3 is filtered out by condition resolver.
+Stage-5 is filtered out by condition resolver.
+Moving data to directory hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_sqoop_import.db/t/.hive-staging_hive_2018-05-07_04-59-23_413_7118372828943552738-1/-ext-10000
+Loading data to table rajeshs_sqoop_import.t
+Table rajeshs_sqoop_import.t stats: [numFiles=1, numRows=1, totalSize=2, rawDataSize=1]
+MapReduce Jobs Launched:
+Stage-Stage-1: Map: 1   Cumulative CPU: 2.38 sec   HDFS Read: 4048 HDFS Write: 80 SUCCESS
+Total MapReduce CPU Time Spent: 2 seconds 380 msec
+OK
+Time taken: 17.059 seconds
+hive (rajeshs_sqoop_import)>
+hive (rajeshs_sqoop_import)> select * from t;
+OK
+1
+Time taken: 0.406 seconds, Fetched: 1 row(s)
+hive (rajeshs_sqoop_import)>
+
+
+
+/************************************ 47. Sqoop Import - Hive - Create Hive Database****End*******************************/
+
+
+/************************************ 48. Sqoop Import - Hive - Simple Hive Import  ****Start*******************************/
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --table order_items \
+  --hive-import \
+  --hive-database rajeshs_sqoop_import \
+  --hive-table order_items \
+  --num-mappers 2 
+
+  output log:
+
+
+  Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/07 05:09:43 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/07 05:09:43 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/07 05:09:43 INFO tool.BaseSqoopTool: Using Hive-specific delimiters for output. You can override
+18/05/07 05:09:43 INFO tool.BaseSqoopTool: delimiters with --fields-terminated-by, etc.
+18/05/07 05:09:43 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/07 05:09:43 INFO tool.CodeGenTool: Beginning code generation
+18/05/07 05:09:44 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:09:44 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:09:44 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/ddd86b8a7807ca3ccc3f93d6b7faa7c3/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/07 05:09:46 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/ddd86b8a7807ca3ccc3f93d6b7faa7c3/order_items.jar
+18/05/07 05:09:46 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/07 05:09:46 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/07 05:09:46 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/07 05:09:46 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/07 05:09:46 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/07 05:09:48 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/07 05:09:48 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/07 05:09:48 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/07 05:09:55 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/07 05:09:55 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/07 05:09:55 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/07 05:09:55 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/07 05:09:55 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2983
+18/05/07 05:09:56 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2983
+18/05/07 05:09:56 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2983/
+18/05/07 05:09:56 INFO mapreduce.Job: Running job: job_1525279861629_2983
+18/05/07 05:10:02 INFO mapreduce.Job: Job job_1525279861629_2983 running in uber mode : false
+18/05/07 05:10:02 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/07 05:10:08 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/07 05:10:09 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/07 05:10:09 INFO mapreduce.Job: Job job_1525279861629_2983 completed successfully
+18/05/07 05:10:09 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319486
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=16080
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=8040
+                Total vcore-milliseconds taken by all map tasks=8040
+                Total megabyte-milliseconds taken by all map tasks=16465920
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=127
+                CPU time spent (ms)=6440
+                Physical memory (bytes) snapshot=626139136
+                Virtual memory (bytes) snapshot=7441063936
+                Total committed heap usage (bytes)=488636416
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=5408880
+18/05/07 05:10:10 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 22.5449 seconds (234.2931 KB/sec)
+18/05/07 05:10:10 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+18/05/07 05:10:10 INFO mapreduce.ImportJobBase: Publishing Hive/Hcat import job data to Listeners
+18/05/07 05:10:10 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:10:10 INFO hive.HiveImport: Loading uploaded data into Hive
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.5.0.0-1245/hive/lib/hive-common-1.2.1000.2.5.0.0-1245.jar!/hive-log4j.properties
+OK
+Time taken: 2.876 seconds
+Loading data to table rajeshs_sqoop_import.order_items
+Table rajeshs_sqoop_import.order_items stats: [numFiles=2, numRows=0, totalSize=5408880, rawDataSize=0]
+OK
+Time taken: 1.539 seconds
+[rajeshs@gw02 ~]$
+
+
+hive (rajeshs_sqoop_import)> show tables;
+OK
+order_items
+t
+values__tmp__table__1
+Time taken: 0.216 seconds, Fetched: 3 row(s)
+hive (rajeshs_sqoop_import)> describe order_items
+                           > ;
+OK
+order_item_id           int
+order_item_order_id     int
+order_item_product_id   int
+order_item_quantity     tinyint
+order_item_subtotal     double
+order_item_product_price        double
+Time taken: 0.358 seconds, Fetched: 6 row(s)
+hive (rajeshs_sqoop_import)> describe formatted order_items
+                           > ;
+OK
+# col_name              data_type               comment
+
+order_item_id           int
+order_item_order_id     int
+order_item_product_id   int
+order_item_quantity     tinyint
+order_item_subtotal     double
+order_item_product_price        double
+
+# Detailed Table Information
+Database:               rajeshs_sqoop_import
+Owner:                  rajeshs
+CreateTime:             Mon May 07 05:10:26 EDT 2018
+LastAccessTime:         UNKNOWN
+Protect Mode:           None
+Retention:              0
+Location:               hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_sqoop_import.db/order_items
+Table Type:             MANAGED_TABLE
+Table Parameters:
+        comment                 Imported by sqoop on 2018/05/07 05:10:10
+        numFiles                2
+        numRows                 0
+        rawDataSize             0
+        totalSize               5408880
+        transient_lastDdlTime   1525684228
+
+# Storage Information
+SerDe Library:          org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+InputFormat:            org.apache.hadoop.mapred.TextInputFormat
+OutputFormat:           org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+Compressed:             No
+Num Buckets:            -1
+Bucket Columns:         []
+Sort Columns:           []
+Storage Desc Params:
+        field.delim             \u0001
+        line.delim              \n
+        serialization.format    \u0001
+Time taken: 0.469 seconds, Fetched: 38 row(s)
+[rajeshs@gw02 ~]$ hdfs dfs -ls hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_sqoop_import.db/order_items
+[rajeshs@gw02 ~]$ hdfs dfs -get hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_sqoop_import.db/order_items .
+
+===============> in hive , default delimeter is ^A (control+A).
+
+example :
+[rajeshs@gw02 order_items]$ view  part-m-00000
+
+^A1^A957^A1^A299.98^A299.98
+2^A2^A1073^A1^A199.99^A199.99
+3^A2^A502^A5^A250.0^A50.0
+4^A2^A403^A1^A129.99^A129.99
+5^A4^A897^A2^A49.98^A24.99
+6^A4^A365^A5^A299.95^A59.99
+7^A4^A502^A3^A150.0^A50.0
+
+
+/************************************ 48. Sqoop Import - Hive - Simple Hive Import  ****End*******************************/
+
+
+/************************************ 49. Sqoop Import - Hive - Managing Hive tables  ****Start*******************************/
+
+Table 8. Hive arguments:
+
+	Argument					Description
+--hive-home <dir>			Override $HIVE_HOME
+--hive-import				Import tables into Hive (Uses Hive’s default delimiters if none are set.)
+--hive-overwrite			Overwrite existing data in the Hive table.
+--create-hive-table			If set, then the job will fail if the target hive table exits. By default this property is false.
+--hive-table <table-name>	Sets the table name to use when importing to Hive.
+--hive-drop-import-delims	Drops \n, \r, and \01 from string fields when importing to Hive.
+--hive-delims-replacement	Replace \n, \r, and \01 from string fields with user defined string when importing to Hive.
+--hive-partition-key		Name of a hive field to partition are sharded on
+--hive-partition-value <v>	String-value that serves as partition key for this imported into hive in this job.
+--map-column-hive <map>		Override default mapping from SQL type to Hive type for configured columns
+
+
+hive (rajeshs_sqoop_import)> select count(1) from order_items;
+Query ID = rajeshs_20180507052737_b73a2f75-47d1-413f-bc52-2c58d482f97f
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks determined at compile time: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Starting Job = job_1525279861629_2984, Tracking URL = http://rm01.itversity.com:19288/proxy/application_1525279861629_2984/
+Kill Command = /usr/hdp/2.5.0.0-1245/hadoop/bin/hadoop job  -kill job_1525279861629_2984
+Hadoop job information for Stage-1: number of mappers: 2; number of reducers: 1
+2018-05-07 05:27:45,797 Stage-1 map = 0%,  reduce = 0%
+2018-05-07 05:27:52,022 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 5.71 sec
+2018-05-07 05:27:59,306 Stage-1 map = 100%,  reduce = 100%, Cumulative CPU 10.38 sec
+MapReduce Total cumulative CPU time: 10 seconds 380 msec
+Ended Job = job_1525279861629_2984
+MapReduce Jobs Launched:
+Stage-Stage-1: Map: 2  Reduce: 1   Cumulative CPU: 10.38 sec   HDFS Read: 5423250 HDFS Write: 7 SUCCESS
+Total MapReduce CPU Time Spent: 10 seconds 380 msec
+OK
+172198
+Time taken: 24.214 seconds, Fetched: 1 row(s)
+
+
+
+
+if we run the same query again we will get duplicate files imported to hive.
+ so we should have --hive-overwrite.  (drop the directory ,recreate the directory)
+
+--create-hive-table	 = fail the command if already table exists
+--hive-overwrite = replace the current dir with new dir.
+ both of above  are mutully exclusive options.
+
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --table order_items \
+  --hive-import \
+  --hive-database rajeshs_sqoop_import \
+  --hive-table order_items \
+  --num-mappers 2 \
+  --hive-overwrite
+
+  Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/07 05:37:05 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/07 05:37:05 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/07 05:37:05 INFO tool.BaseSqoopTool: Using Hive-specific delimiters for output. You can override
+18/05/07 05:37:05 INFO tool.BaseSqoopTool: delimiters with --fields-terminated-by, etc.
+18/05/07 05:37:06 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/07 05:37:06 INFO tool.CodeGenTool: Beginning code generation
+18/05/07 05:37:07 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:37:07 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:37:07 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/1f3f59dd6f66ddf6db7692b0d7354809/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/07 05:37:08 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/1f3f59dd6f66ddf6db7692b0d7354809/order_items.jar
+18/05/07 05:37:08 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/07 05:37:08 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/07 05:37:08 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/07 05:37:08 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/07 05:37:08 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/07 05:37:11 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/07 05:37:11 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/07 05:37:11 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/07 05:37:18 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/07 05:37:18 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/07 05:37:18 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/07 05:37:18 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/07 05:37:19 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2985
+18/05/07 05:37:19 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2985
+18/05/07 05:37:19 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2985/
+18/05/07 05:37:19 INFO mapreduce.Job: Running job: job_1525279861629_2985
+18/05/07 05:37:27 INFO mapreduce.Job: Job job_1525279861629_2985 running in uber mode : false
+18/05/07 05:37:27 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/07 05:37:33 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/07 05:37:34 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/07 05:37:35 INFO mapreduce.Job: Job job_1525279861629_2985 completed successfully
+18/05/07 05:37:35 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319486
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=16008
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=8004
+                Total vcore-milliseconds taken by all map tasks=8004
+                Total megabyte-milliseconds taken by all map tasks=16392192
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=168
+                CPU time spent (ms)=6870
+                Physical memory (bytes) snapshot=676884480
+                Virtual memory (bytes) snapshot=7444860928
+                Total committed heap usage (bytes)=481296384
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=5408880
+18/05/07 05:37:35 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 24.6582 seconds (214.2129 KB/sec)
+18/05/07 05:37:35 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+18/05/07 05:37:35 INFO mapreduce.ImportJobBase: Publishing Hive/Hcat import job data to Listeners
+18/05/07 05:37:35 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:37:35 INFO hive.HiveImport: Loading uploaded data into Hive
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.5.0.0-1245/hive/lib/hive-common-1.2.1000.2.5.0.0-1245.jar!/hive-log4j.properties
+OK
+Time taken: 1.461 seconds
+Loading data to table rajeshs_sqoop_import.order_items
+Table rajeshs_sqoop_import.order_items stats: [numFiles=2, numRows=0, totalSize=5408880, rawDataSize=0]
+OK
+Time taken: 1.241 seconds
+
+
+
+--create-hive-table	 = fail the command if already table exists
+
+but the failure message will be displayed at the time of hive import from sqoop staged location.
+which means sqoop import will be success even if hive table already exists. which is kind of bug.
+and user has to manually delete the staged dir, otherwise the next time hive import will fail at sqoop import stage even if you gave --hive-overwrite.
+
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --table order_items \
+  --hive-import \
+  --hive-database rajeshs_sqoop_import \
+  --hive-table order_items \
+  --num-mappers 2 \
+  --create-hive-table
+
+  Warning: /usr/hdp/2.5.0.0-1245/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/05/07 05:50:56 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.5.0.0-1245
+18/05/07 05:50:56 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/05/07 05:50:56 INFO tool.BaseSqoopTool: Using Hive-specific delimiters for output. You can override
+18/05/07 05:50:56 INFO tool.BaseSqoopTool: delimiters with --fields-terminated-by, etc.
+18/05/07 05:50:56 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/05/07 05:50:56 INFO tool.CodeGenTool: Beginning code generation
+18/05/07 05:50:57 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:50:57 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:50:57 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.5.0.0-1245/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/9ea3a030515e47bc17cf15fd4b645fa8/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/05/07 05:50:59 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/9ea3a030515e47bc17cf15fd4b645fa8/order_items.jar
+18/05/07 05:50:59 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/05/07 05:50:59 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/05/07 05:50:59 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/05/07 05:50:59 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/05/07 05:50:59 INFO mapreduce.ImportJobBase: Beginning import of order_items
+18/05/07 05:51:01 INFO impl.TimelineClientImpl: Timeline service address: http://rm01.itversity.com:8188/ws/v1/timeline/
+18/05/07 05:51:01 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/05/07 05:51:02 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/05/07 05:51:09 INFO db.DBInputFormat: Using read commited transaction isolation
+18/05/07 05:51:09 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`order_item_id`), MAX(`order_item_id`) FROM `order_items`
+18/05/07 05:51:09 INFO db.IntegerSplitter: Split size: 86098; Num splits: 2 from: 1 to: 172198
+18/05/07 05:51:09 INFO mapreduce.JobSubmitter: number of splits:2
+18/05/07 05:51:10 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1525279861629_2987
+18/05/07 05:51:10 INFO impl.YarnClientImpl: Submitted application application_1525279861629_2987
+18/05/07 05:51:10 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1525279861629_2987/
+18/05/07 05:51:10 INFO mapreduce.Job: Running job: job_1525279861629_2987
+18/05/07 05:51:16 INFO mapreduce.Job: Job job_1525279861629_2987 running in uber mode : false
+18/05/07 05:51:16 INFO mapreduce.Job:  map 0% reduce 0%
+18/05/07 05:51:24 INFO mapreduce.Job:  map 50% reduce 0%
+18/05/07 05:51:25 INFO mapreduce.Job:  map 100% reduce 0%
+18/05/07 05:51:27 INFO mapreduce.Job: Job job_1525279861629_2987 completed successfully
+18/05/07 05:51:28 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=319486
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=254
+                HDFS: Number of bytes written=5408880
+                HDFS: Number of read operations=8
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=4
+        Job Counters
+                Launched map tasks=2
+                Other local map tasks=2
+                Total time spent by all maps in occupied slots (ms)=25514
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=12757
+                Total vcore-milliseconds taken by all map tasks=12757
+                Total megabyte-milliseconds taken by all map tasks=26126336
+        Map-Reduce Framework
+                Map input records=172198
+                Map output records=172198
+                Input split bytes=254
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=250
+                CPU time spent (ms)=11560
+                Physical memory (bytes) snapshot=656666624
+                Virtual memory (bytes) snapshot=7447375872
+                Total committed heap usage (bytes)=497025024
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=5408880
+18/05/07 05:51:28 INFO mapreduce.ImportJobBase: Transferred 5.1583 MB in 27.0511 seconds (195.2641 KB/sec)
+18/05/07 05:51:28 INFO mapreduce.ImportJobBase: Retrieved 172198 records.
+18/05/07 05:51:28 INFO mapreduce.ImportJobBase: Publishing Hive/Hcat import job data to Listeners
+18/05/07 05:51:28 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `order_items` AS t LIMIT 1
+18/05/07 05:51:28 INFO hive.HiveImport: Loading uploaded data into Hive
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.5.0.0-1245/hive/lib/hive-common-1.2.1000.2.5.0.0-1245.jar!/hive-log4j.properties
+FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. AlreadyExistsException(message:Table order_items already exists)
+
+
+so this means even though we got AlreadyExistsException while importing to hive db, we can see that sqoop staging location is not properly clean up. as this process failed at the time of moving the data from sqoop to hive.
+
+so manually delete the sqoop directory here to avoid AlreadyExistsException at the time of sqoop import next time.
+
+/************************************ 49. Sqoop Import - Hive - Managing Hive tables  ****End*******************************/
+
+
+
+/************************************ 50. Sqoop Import - Import all tables  ****Start*******************************/
+
+for importing all the tables , 
+1) warehouse-dir is mandatory
+2)do not give --table
+3)cannot use --col, --query, --where ,--split-by as such table structure specific rules  
+4)incremental import is not possible
+5) use --autoreset-to-one-mapper
+
+
+sqoop import-all-tables \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --warehouse-dir /user/rajeshs/sqoop_import/retail_db/ \
+  --autoreset-to-one-mapper
+
+it will import all the tables one after another.
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls  /user/rajeshs/sqoop_import/retail_db
+
+Found 7 items
+
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:06 /user/rajeshs/sqoop_import/retail_db/categories
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:06 /user/rajeshs/sqoop_import/retail_db/customers
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:06 /user/rajeshs/sqoop_import/retail_db/departments
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:07 /user/rajeshs/sqoop_import/retail_db/order_items
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:07 /user/rajeshs/sqoop_import/retail_db/order_items_nopk
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:07 /user/rajeshs/sqoop_import/retail_db/orders
+drwxr-xr-x   - rajeshs hdfs          0 2018-05-07 06:09 /user/rajeshs/sqoop_import/retail_db/products
+
+/************************************ 50. Sqoop Import - Import all tables  ****End*******************************/
+
+
+
+/******************************** 51.Role of Sqoop in typical data processing lifecycle****Start*******************************/
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password cloudera \
+  --table orders \
+  --hive-import \
+  --hive-database rajeshs_sqoop_import \
+  --hive-table orders \
+  --num-mappers 2 \
+  --create-hive-table
+
+
+create table daily_revenue as
+select order_date,sum(order_item_subtotal) daily_revenue
+from orders join order_items on 
+order_id= order_item_order_id
+where order_date like '2013-07%'
+group by order_date
+
+hive (rajeshs_sqoop_import)> select order_date,sum(order_item_subtotal) daily_revenue
+                           > from orders join order_items on
+                           > order_id= order_item_order_id
+                           > where order_date like '2013-07%'
+                           > group by order_date
+                           > ;
+Query ID = rajeshs_20180507064033_be574781-b924-40dd-b707-c094db660bb4
+Total jobs = 1
+Execution log at: /tmp/rajeshs/rajeshs_20180507064033_be574781-b924-40dd-b707-c094db660bb4.log
+2018-05-07 06:40:44     Starting to launch local task to process map join;      maximum memory = 1046478848
+2018-05-07 06:40:46     Dump the side-table for tag: 0 with group count: 1533 into file: file:/tmp/rajeshs/de74e03e-4679-4392-8793-7b5149154a13/hive_2018-05-07_06-40-33_849_5403070451271418118-1/-local-10004/HashTable-Stage-2/MapJoin-mapfile00--.hashtable
+2018-05-07 06:40:46     Uploaded 1 File to: file:/tmp/rajeshs/de74e03e-4679-4392-8793-7b5149154a13/hive_2018-05-07_06-40-33_849_5403070451271418118-1/-local-10004/HashTable-Stage-2/MapJoin-mapfile00--.hashtable (66154 bytes)
+2018-05-07 06:40:46     End of local task; Time Taken: 2.034 sec.
+Execution completed successfully
+MapredLocal task succeeded
+Launching Job 1 out of 1
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Starting Job = job_1525279861629_3030, Tracking URL = http://rm01.itversity.com:19288/proxy/application_1525279861629_3030/
+Kill Command = /usr/hdp/2.5.0.0-1245/hadoop/bin/hadoop job  -kill job_1525279861629_3030
+Hadoop job information for Stage-2: number of mappers: 1; number of reducers: 1
+2018-05-07 06:40:53,170 Stage-2 map = 0%,  reduce = 0%
+2018-05-07 06:40:59,358 Stage-2 map = 100%,  reduce = 0%, Cumulative CPU 5.77 sec
+2018-05-07 06:41:06,570 Stage-2 map = 100%,  reduce = 100%, Cumulative CPU 9.5 sec
+MapReduce Total cumulative CPU time: 9 seconds 500 msec
+Ended Job = job_1525279861629_3030
+MapReduce Jobs Launched:
+Stage-Stage-2: Map: 1  Reduce: 1   Cumulative CPU: 9.5 sec   HDFS Read: 5422945 HDFS Write: 284 SUCCESS
+Total MapReduce CPU Time Spent: 9 seconds 500 msec
+OK
+2013-07-25 00:00:00.0   68153.82999999997
+2013-07-26 00:00:00.0   136520.1700000003
+2013-07-27 00:00:00.0   101074.34000000014
+2013-07-28 00:00:00.0   87123.08000000013
+2013-07-29 00:00:00.0   137287.09000000032
+2013-07-30 00:00:00.0   102745.62000000011
+2013-07-31 00:00:00.0   131878.06000000006
+Time taken: 34.983 seconds, Fetched: 7 row(s)
+
+
+
+
+/******************************** 51.Role of Sqoop in typical data processing lifecycle****End*******************************/
+
+
+
+
+
+Data present at : /home/cloudera/data/retail_db/
+
+categories/
+customers/
+departments/
+order_items/
+orders/
+orders_column_mapping/
+orders_exported/
+products/
+t/
+
+val orders=sc.textFile("file:////home/cloudera/data/retail_db/orders/part-m-00000")
+val order_items=sc.textFile("file:////home/cloudera/data/retail_db/order_items/part-m-00000")
+val products=sc.textFile("file:////home/cloudera/data/retail_db/products/part-m-00000")
+

@@ -1,0 +1,162 @@
+1) Sqoop import from account table only with only filter city = Dallas.
+Ans :
+sqoop import \
+--connect jdbc:mysql://gateway/problem1 \
+--username root \
+--password root \
+--table account \
+--where "city='Dallas' " \
+--as-textfile \
+--fields-terminated-by '\t' \
+--target-dir /user/p1/solution \
+-m 1 (--num-mappers 1)
+##Different filter conditions with --where clause
+sqoop import --connect jdbc:mysql://quickstart:3306/retail_db --username=retail_dba
+--password=root --table orders --target-dir /user/root/sqoopOutputs/order_comp_closed
+--where "order_status='CLOSED' OR order_status='COMPLETE'" --fields-terminated-by
+‘|’ -m 1 (--num-mappers 1)
+##Different filter conditions with --query clause
+sqoop import --connect jdbc:mysql://quickstart/retail_db --username root --password root
+--query "SELECT order_id, order_date, order_status from orders where order_status in
+('COMPLETE', 'CLOSED') and \$CONDITIONS" --target-dir user/root/for_export
+--split-by order_id --fields-terminated-by '|' -m 1 (--num-mappers 1)
+Note : For sqoop import chose 1 mapper unless it’s specified (to avoid split-by), for sqoop
+export use 12 mapper to get high performance.
+2) Sqoop export 25 million records. data was tab delimited in hdfs
+Ans:
+sqoop export --connect jdbc:mysql://quickstart/retail_export --username root --password
+root --table for_export --export-dir user/root/for_export --input-fields-terminated-by "\t" -m
+12 (--num-mappers 12)
+Note : Check for input file delimiter manually using hadoop fs -cat command.
+ 3) Hive metastore table is given. Problem3 is the database and billing is the table
+name. Get the records from billing table where charges > 10. billing table in hive
+metastore need to read and charge>10 and save output as parquet file gzip compression.
+Ans: sqlContext.setConf(“spark.sql.parquet.compression.codec”,”gzip”)
+sqlContext.getConf(“spark.sql.parquet.compression.codec”) //Verify compression
+result = sqlContext.sql("select * from problem3.billing where charge>10")
+result.write.parquet(“filePath”)
+4(1). Customer data in avro needs to print first name, last name and state.
+customers =
+sqlContext.read.format(“com.databricks.spark.avro”).load(“/user/root/customers”)
+customers.registerTempTable('customersDF')
+customersByState = sqlContext.sql('select fname, lname, state from customersDF')
+customersByState.rdd.coalesce(1).map(lambda x:
+"/t".join(map(str,x))).saveAsTextFile('sameera/problem4')
+4(2) count customers in each city and state, group by city, state. output in text
+formate tab delimited.
+Ans:
+if the given Customers File is AVRO
+customers = sqlContext.read.avro('retail_db_avro/customers')
+or
+customers =
+sqlContext.read.format(“com.databricks.spark.avro”).load(“/user/root/customers”)
+customers.registerTempTable('customersDF')
+customersByCityState = sqlContext.sql('select count(*) as customer_count,
+customer_city from customersDF')
+customersByCityState.rdd.coalesce(1).map(lambda x:
+"/t".join(map(str,x))).saveAsTextFile('sameera/problem4')
+4(3). count customers in each city and state, group by city, state. output in text
+formate tab delimited
+if the given Customers File is Text
+Step-0 : customers = sc.textFile("/user/root/question_4")
+Step-1 : from pyspark.sql import Row
+Step-2 : Customers =
+Row('customer_id','customer_fname','customer_lname','customer_email','customer_password','c
+ustomer_street','customer_city','customer_state','customer_zipcode')
+Step-3 : customerWithSchema = customers.map(lambda c: c.split("\t")).map(lambda c:
+Customers(*c))
+OR
+Step-3 : customerWithSchema2 = customers.map(lambda c: c.split("\t")).map(lambda c:
+Customers(c[0],c[1],c[2],c[3],c[4],c[5],c[6],c[7]))
+Step-4 : custDF = sqlContext.createDataFrame(customerWithSchema)
+Step-5 : custDF.registerTempTable("customerTable")
+Step-6 : resDF = sqlContext.sql("select count(*) count, customer_city, customer_state
+from customerTable group by customer_city, customer_state")
+Step-7: resDF.rdd.map(lambda x:
+"\t".join(map(str,x))).saveAsTextFile("/user/root/question_4/textFileTab")
+5(1) json source and save it in avro format with snappy with same schema, used avro
+tools to verify the codec and schema
+Ans:
+customers_json = sqlContext.sql('data-master/data-master/retail_db_json/customers')
+sqlContext.setConf('spark.sql.avro.compression.codec', 'snappy')
+customers_json.write.format(“com.databricks.spark.avro”).save(“/user/root/avroFile”)
+verify output: hadoop fs -copyToLocal <source> <destination>
+avro-tools getmeta <destination_avro_file_at_local>
+5(2) Json to Parquet customers Data
+customers_json = sqlContext.sql('data-master/data-master/retail_db_json/customers')
+sqlContext.setConf('spark.sql.parquet.compression.codec', 'snappy')
+customers_json.write.parquet('customers_from_json_parquet_snappy')
+5(3) Avro to parquet format customer Data
+Start pyspark with only ‘pyspark’ or ‘pyspark --master yarn’
+avroContentDF =
+sqlContext.read.format(“com.databricks.spark.avro”).load(“/user/root/avroFile”)
+####### Apply compression if necessary, Ex: snappy #####
+# sqlContext.setConf("spark.sql.parquet.compression.codec","snappy")
+avroContentDF.write.parquet(“filePath”)
+######## Verify output #######
+hadoop parquet.tools.Main meta
+/user/root/exam/question_6/newJsonAvroPy/AnsParquet/part-r-00000-a3df5869-87e1-4b2e-93d
+5-16d6373caebf.snappy.parquet
+OR hadoop fs -cat filename.parquet | head
+6). customer first name, last name sort with last name name and leave first name
+without sorting. save in text format fname space lname. (Verify lname, fname order while
+writing)
+Ans:
+#Read text file.
+customers = sc.textFile("/user/root/exam/question_6/customers")
+#Convert to DF from RDD. Make sure provide List to toDF() arguments (Use square
+brackets to make list)
+customerDF = customers.map(lambda x: x.split("\t")).map(lambda x: (x[1],
+x[2])).toDF(["fname","lname"])
+#Convert to register temp table.
+customerDF.registerTempTable("customersTable")
+#Produce required output: fname tab space lname.
+fullfullNameSortByLnameDF = sqlContext.sql("select concat(fname,'\t',lname) as FullName from
+customersTable order by lname")
+#use rdd.map and join to convert into rdd and it’ll remove brackets.
+result = fullNameSortByLnameDF.rdd.map( lambda x: "".join(map(str,x)))
+#Save the results.
+result.saveAsTextFile("/user/root/exam/question_6/customers/problem6_Output")
+ 7) billing and customer in hdfs , both tab delimited, fins customer owed amount for
+single billing transaction. save fname space lname tab amount in text format
+Ans :
+Note : Changed the select fields only as per available data in vm . Logic is same. Do not get
+confused.
+Customer and orders table.
+customers = sc.textFile("/user/root/exam/question_6/customers")
+billing = sc.textFile("/user/root/exam/question_7/input")
+billingDF = billings.map(lambda x: x.split("\t")).map(lambda x: (x[2],
+x[3])).toDF(["customer_id","status"])
+customerDF = customers.map(lambda x: x.split("\t")).map(lambda x: (x[0], x[1], x[2],
+x[8])).toDF(["customer_id","fname","lname","amount"])
+customerDF.registerTempTable("custTable")
+billingDF.registerTempTable("billingTable")
+result = sqlContext.sql("select concat(fname,' ',lname) as Full_Name, amount, status
+from custTable inner join billingTable on custTable.customer_id = billingTable.customer_id
+where amount is not null")
+result.rdd.map(lambda x:
+"\t".join(map(str,x))).saveAsTextFile("/user/root/question_7/Output")
+8) customers in hdfs , filter for state = TX and save as parquet uncompressed format
+Ans:
+customers = sc.textFile("/user/root/exam/question_6/customers")
+customerDF = customers.map(lambda x: x.split("\t")).map(lambda x:
+(x[1],x[2],x[7])).toDF(["fname","lname","state"])
+customerDF.registerTempTable("customerTable")
+result = sqlContext.sql("select fname, lname from customerTable where state == 'TX'")
+sqlContext.setConf(“spark.sql.parquet.compression.codec”,”uncompressed”)
+result.write.parquet(“"/user/root/exam/question_8/outputParquet"”)
+## Optional : to save as text ##
+result.rdd.map(lambda x:
+"\t".join(map(str,x))).saveAsTextFile("/user/root/exam/question_8/output")
+9). Out of 20 columns in employee table which is in hdfs in text file format with tab
+delimiter need to output first 7 columns which has id, fname, lname and address details
+with pipe as delimiter and text file format
+Ans :
+##Read the file##
+employees = sc.textFile("/user/root/exam/question_6/customers")
+## Get the required first 7 columns: 0 to 6 ##
+resultRDD = employees.map(lambda x: x.split("\t")).map(lambda x:
+(x[0],x[1],x[2],x[3],x[4],x[5],x[6]))
+## Save as text file ##
+resultRDD.map(lambda x:
+"|".join(map(str,x))).saveAsTextFile("/user/root/exam/question_9/Output")

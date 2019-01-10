@@ -1,0 +1,169 @@
+hive (rajeshs_retail_db_orc)> create database rajesh_retail_db_total;
+OK
+Time taken: 0.413 seconds
+hive (rajeshs_retail_db_orc)> use rajesh_retail_db_total;
+OK
+
+
+hive (rajesh_retail_db_total)> show tables;
+OK
+Time taken: 0.219 seconds
+hive (rajesh_retail_db_total)>
+
+
+// load all the tables of retail_db by using sqoop import
+
+
+
+[rajeshs@gw02 ~]$ sqoop import-all-tables \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+   --username retail_user \
+   --password itversity \
+   --hive-import \
+   --hive-database rajesh_retail_db_total \
+   --num-mappers 12
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/02 04:08:01 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/02 04:08:01 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/02 04:08:01 INFO tool.BaseSqoopTool: Using Hive-specific delimiters for output. You can override
+18/10/02 04:08:01 INFO tool.BaseSqoopTool: delimiters with --fields-terminated-by, etc.
+18/10/02 04:08:01 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/02 04:08:01 INFO tool.CodeGenTool: Beginning code generation
+18/10/02 04:08:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `categories` AS t LIMIT 1
+18/10/02 04:08:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `categories` AS t LIMIT 1
+18/10/02 04:08:02 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/0eef74058001cb39e9e817d961e76833/categories.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/02 04:08:03 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/0eef74058001cb39e9e817d961e76833/categories.jar
+18/10/02 04:08:03 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/10/02 04:08:03 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/10/02 04:08:03 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/10/02 04:08:03 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/10/02 04:08:04 INFO mapreduce.ImportJobBase: Beginning import of categories
+18/10/02 04:08:05 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/02 04:08:05 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/02 04:08:12 INFO db.DBInputFormat: Using read commited transaction isolation
+18/10/02 04:08:12 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`category_id`), MAX(`category_id`) FROM `categories`
+18/10/02 04:08:12 INFO db.IntegerSplitter: Split size: 4; Num splits: 12 from: 1 to: 58
+18/10/02 04:08:13 INFO mapreduce.JobSubmitter: number of splits:12
+18/10/02 04:08:13 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_1231
+18/10/02 04:08:14 INFO impl.YarnClientImpl: Submitted application application_1538287994192_1231
+18/10/02 04:08:14 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_1231/
+18/10/02 04:08:14 INFO mapreduce.Job: Running job: job_1538287994192_1231
+18/10/02 04:08:22 INFO mapreduce.Job: Job job_1538287994192_1231 running in uber mode : false
+18/10/02 04:08:22 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/02 04:08:27 INFO mapreduce.Job:  map 8% reduce 0%
+18/10/02 04:08:28 INFO mapreduce.Job:  map 17% reduce 0%
+18/10/02 04:08:29 INFO mapreduce.Job:  map 42% reduce 0%
+18/10/02 04:08:30 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/02 04:08:31 INFO mapreduce.Job: Job job_1538287994192_1231 completed successfully
+18/10/02 04:08:31 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=2028578
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=1414
+                HDFS: Number of bytes written=1029
+                HDFS: Number of read operations=48
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=24
+        Job Counters
+                Launched map tasks=12
+                Other local map tasks=12
+                Total time spent by all maps in occupied slots (ms)=114264
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=57132
+                Total vcore-milliseconds taken by all map tasks=57132
+                Total megabyte-milliseconds taken by all map tasks=117006336
+        Map-Reduce Framework
+                Map input records=58
+                Map output records=58
+                Input split bytes=1414
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=999
+                CPU time spent (ms)=18920
+                Physical memory (bytes) snapshot=3254087680
+                Virtual memory (bytes) snapshot=44626731008
+                Total committed heap usage (bytes)=2776629248
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=1029
+18/10/02 04:08:31 INFO mapreduce.ImportJobBase: Transferred 1.0049 KB in 26.722 seconds (38.5075 bytes/sec)
+18/10/02 04:08:31 INFO mapreduce.ImportJobBase: Retrieved 58 records.
+18/10/02 04:08:31 INFO mapreduce.ImportJobBase: Publishing Hive/Hcat import job data to Listeners
+18/10/02 04:08:31 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `categories` AS t LIMIT 1
+18/10/02 04:08:31 INFO hive.HiveImport: Loading uploaded data into Hive
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.6.5.0-292/hive/lib/hive-common-1.2.1000.2.6.5.0-292.jar!/hive-log4j.properties
+OK
+Time taken: 2.364 seconds
+Loading data to table rajesh_retail_db_total.categories
+Table rajesh_retail_db_total.categories stats: [numFiles=12, numRows=0, totalSize=1029, rawDataSize=0]
+OK
+Time taken: 1.419 seconds
+Note: /tmp/sqoop-rajeshs/compile/0eef74058001cb39e9e817d961e76833/customers.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.6.5.0-292/hive/lib/hive-common-1.2.1000.2.6.5.0-292.jar!/hive-log4j.properties
+OK
+Time taken: 1.019 seconds
+Loading data to table rajesh_retail_db_total.customers
+Table rajesh_retail_db_total.customers stats: [numFiles=12, numRows=0, totalSize=953525, rawDataSize=0]
+OK
+Time taken: 1.115 seconds
+Note: /tmp/sqoop-rajeshs/compile/0eef74058001cb39e9e817d961e76833/departments.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+Logging initialized using configuration in jar:file:/usr/hdp/2.6.5.0-292/hive/lib/hive-common-1.2.1000.2.6.5.0-292.jar!/hive-log4j.properties
+OK
+Time taken: 0.341 seconds
+Loading data to table rajesh_retail_db_total.departments
+Table rajesh_retail_db_total.departments stats: [numFiles=6, numRows=0, totalSize=60, rawDataSize=0]
+OK
+Time taken: 0.967 seconds
+Note: /tmp/sqoop-rajeshs/compile/0eef74058001cb39e9e817d961e76833/order_items.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+[rajeshs@gw02 ~]$
+
+
+
+
+sqoop import \
+ --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table orders \
+  --hive-import \
+  --hive-table orders \
+  --hive-database rajesh_retail_db_total
+  
+  
+  sqoop import \
+ --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --hive-import \
+  --hive-table order_items \
+  --hive-database rajesh_retail_db_total
+  
+  
+
+ hive (rajesh_retail_db_total)> show tables;
+OK
+categories
+customers
+departments
+order_items
+orders
+Time taken: 1.611 seconds, Fetched: 5 row(s)
+hive (rajesh_retail_db_total)>
+
+
+select rank(order_item_product_id) over (partition by oi.order_item_product_id) as order_product_id, o.order_id, o.order_date_1, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue from orders1 o join order_items oi on o.order_id = oi.order_item_order_id group by o.order_id, o.order_date_1, o.order_status

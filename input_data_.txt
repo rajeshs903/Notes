@@ -1,0 +1,153 @@
+/*
+1) sqoop import with only few columns
+Sqoop import from account table only with selected columns
+only order_status that are completed
+
+input : table customers 
+output : only state NY, "\t", compression parquet snappy
+path : /user/rajeshs/practice/problem1/output
+
+sqoop eval --connect jdbc:mysql://quickstart.cloudera:3306/retail_db --username root --P --query "select * from order_items limit 10"
+password : cloudera
+ table orders
+
+
+
+
+
+
+=======
+*/
+
+
+/*
+2) sqoop export with tab delimited data ..export to mysql provided table
+Sqoop export 25 million records. data was tab delimited in hdfs
+
+mysql -u retail_dba -h quickstart -p
+password : cloudera
+
+or 
+
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+
+
+CREATE TABLE `orders_exported` (
+  `order_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_date` datetime NOT NULL,
+  `order_status` varchar(45) NOT NULL,
+  PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=68884 DEFAULT CHARSET=utf8 
+
+input : 
+
+
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+mysql> use retail_export;
+
+table : customers_export_rajeshs
+
+input file  : /user/rajeshs/sqoop_import/retail_db/customers
+
+output export
+*/
+
+
+
+/*
+3) select data where charge > 10$. Save as parquet gzip format
+Hive metastore table is given. Problem3 is the database and billing is the table
+name. Get the records from billing table where charges > 10. billing table in hive
+metastore need to read and charge>10 and save output as parquet file gzip compression.
+
+order_items subtotal > 299.95
+ input : hive metastore or /user/rajeshs/sqoop_import/compress/order_items_avro_compress_snappy 
+ output : /user/rajeshs/practice/problem3/output as parquet Gzip
+
+
+*/
+
+/*
+4) Given data in tab format, 8 columns total. get the first name, last name, state only.
+Save it as parquet snappy format.
+Customer data in text tab delim, needs to print first name, last name and state and
+save as parquet with snappy.
+
+input : convert CSV /user/rajeshs/sqoop_import/retail_db/customers to "\t" in /user/rajeshs/practice/problem4/input then use it as input file
+output : fname,lname,state
+file format : parquet snappy
+
+*/
+
+
+
+/*
+5) Provided almost similar data as previous.. except they change street column to
+address columns. Select count of customers based on each city and state.. save as text
+tab delimiter.
+
+copy /user/rajeshs/practice/problem4/input to /user/rajeshs/practice/problem5/input then use it as input
+output : count of customers based on each city and state
+file : "\t"  text format
+
+
+*/
+
+
+/*
+6) String Manipulation, they provided many columns comma delimiter text format . Just
+want output as fname, lname, column name as “alias “ concatenation first character of
+fname and lname.
+Ex: Meghal Gandhi MGandhi.
+Save as parquet gzip format.
+
+
+input : copy /user/rajeshs/sqoop_import/retail_db/customers to /user/rajeshs/practice/problem6/input then use it as input
+output : fname, lname, column name as “alias “ concatenation first character of
+fname and lname.
+file : parquet Gzip
+
+
+*/
+
+
+/*
+7) Famous billing customers question.
+billing and customer in hdfs , both tab delimited, fins customer owed amount for
+single billing transaction. save fname space lname tab amount in text format.
+
+/data/retail_db/products
+/data/retail_db/order_items
+
+product_category_id = order_item_product_id
+
+
+*/
+
+
+/*
+8) Parquet sensor data has given . Find the avg temperature based on phone model. save
+as comma delim text format
+
+use order items 
+
+text csv is output
+
+*/
+
+
+
+/*
+9) Employee birthday anniversary report. Provided data in text with tab delim.
+Get the first name space last name, employee birthday Year/Month. sort by employee
+birthday only. if two birthdays are same then no need to sort by name.
+Ex: Meghal Gandhi 11/19
+
+ use orders dataset for input :
+
+ output  2 columns : order_id[]status , date format
+ text with "\t"
+*/
+

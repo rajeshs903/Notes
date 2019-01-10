@@ -1,0 +1,135 @@
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+
+mysql> use retail_export;
+ 
+ 
+ select * from 
+
+
+/***********/
+
+To practice Rank over , created a table 'person' in retail_export db
+
+CREATE TABLE person (id int, first_name varchar(20), age int, gender char(1));
+INSERT INTO person VALUES (1, 'Bob', 25, 'M');
+INSERT INTO person VALUES (2, 'Jane', 20, 'F');
+INSERT INTO person VALUES (3, 'Jack', 30, 'M');
+INSERT INTO person VALUES (4, 'Bill', 32, 'M');
+INSERT INTO person VALUES (5, 'Nick', 22, 'M');
+INSERT INTO person VALUES (6, 'Kathy', 18, 'F');
+INSERT INTO person VALUES (7, 'Steve', 36, 'M');
+INSERT INTO person VALUES (8, 'Anne', 25, 'F');
+
+
+SELECT    first_name,age,          gender,          @curRank := @curRank + 1 AS rank
+FROM      person p, (SELECT @curRank := 0) r
+ORDER BY  age;
+
++------------+------+--------+------+
+| first_name | age  | gender | rank |
++------------+------+--------+------+
+| Kathy      |   18 | F      |    1 |
+| Jane       |   20 | F      |    2 |
+| Nick       |   22 | M      |    3 |
+| Bob        |   25 | M      |    4 |
+| Anne       |   25 | F      |    5 |
+| Jack       |   30 | M      |    6 |
+| Bill       |   32 | M      |    7 |
+| Steve      |   36 | M      |    8 |
++------------+------+--------+------+
+8 rows in set (0.02 sec)
+
+
+select * from person;
+mysql> select * from person;
++------+------------+------+--------+
+| id   | first_name | age  | gender |
++------+------------+------+--------+
+|    1 | Bob        |   25 | M      |
+|    2 | Jane       |   20 | F      |
+|    3 | Jack       |   30 | M      |
+|    4 | Bill       |   32 | M      |
+|    5 | Nick       |   22 | M      |
+|    6 | Kathy      |   18 | F      |
+|    7 | Steve      |   36 | M      |
+|    8 | Anne       |   25 | F      |
++------+------------+------+--------+
+8 rows in set (0.00 sec)
+
+SELECT RANK() OVER ,
+  first_name, 
+  age,
+  gender 
+FROM person;
+
+"id","first_name", "age", "gender"
+/***********/
+
+scala> val personDF= sc.textFile("/user/rajeshs/sqoop_import_practice/temporary_tables/").
+     | map(x=> {
+     | val p = x.split(",")
+     | (p(0).toInt,p(1),p(2).toInt,p(3))}).toDF("id","first_name", "age", "gender")
+personDF: org.apache.spark.sql.DataFrame = [id: int, first_name: string, age: int, gender: string]
+
+
+scala> personDF.show
++---+----------+---+------+
+| id|first_name|age|gender|
++---+----------+---+------+
+|  1|       Bob| 25|     M|
+|  2|      Jane| 20|     F|
+|  3|      Jack| 30|     M|
+|  4|      Bill| 32|     M|
+|  5|      Nick| 22|     M|
+|  6|     Kathy| 18|     F|
+|  7|     Steve| 36|     M|
+|  8|      Anne| 25|     F|
++---+----------+---+------+
+
+scala> personDF.registerTempTable("person")
+
+scala> 
+sqlContext.sql("SELECT RANK() OVER (PARTITION BY gender ORDER BY age) as rank, first_name,age,gender FROM person").show
++----+----------+---+------+
+|rank|first_name|age|gender|
++----+----------+---+------+
+|   1|      Bill| 32|     M|
+|   1|     Steve| 36|     M|
+|   1|     Kathy| 18|     F|
+|   1|      Jane| 20|     F|
+|   1|      Nick| 22|     M|
+|   1|      Anne| 25|     F|
+|   2|       Bob| 25|     M|
+|   1|      Jack| 30|     M|
++----+----------+---+------+
+scala> 
+sqlContext.sql("SELECT RANK() OVER (PARTITION BY gender ORDER BY age) as rank, first_name,age,gender FROM person order by rank").show
++----+----------+---+------+
+|rank|first_name|age|gender|
++----+----------+---+------+
+|   1|     Kathy| 18|     F|
+|   2|      Jane| 20|     F|
+|   3|      Anne| 25|     F|
+|   1|      Nick| 22|     M|
+|   2|       Bob| 25|     M|
+|   3|      Jack| 30|     M|
+|   4|      Bill| 32|     M|
+|   5|     Steve| 36|     M|
++----+----------+---+------+
+
+scala> sqlContext.sql("SELECT RANK() OVER (PARTITION BY gender ORDER BY age) as rank, first_name,age,gender FROM person order by rank").show
++----+----------+---+------+
+|rank|first_name|age|gender|
++----+----------+---+------+
+|   1|      Nick| 22|     M|
+|   1|     Kathy| 18|     F|
+|   2|      Jane| 20|     F|
+|   2|       Bob| 25|     M|
+|   3|      Jack| 30|     M|
+|   3|      Anne| 25|     F|
+|   4|      Bill| 32|     M|
+|   5|     Steve| 36|     M|
++----+----------+---+------+
+
+

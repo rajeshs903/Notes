@@ -1,0 +1,18 @@
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+mysql> use retail_export;
+
+
+
+ CREATE TABLE customers_export_rajeshs (
+  customer_id int(11) NOT NULL AUTO_INCREMENT,
+  customer_fname varchar(45) NOT NULL,
+  customer_lname varchar(45) NOT NULL,
+  customer_email varchar(45) NOT NULL,
+  customer_password varchar(45) NOT NULL,
+  customer_street varchar(255) NOT NULL,
+  customer_city varchar(45) NOT NULL,
+  customer_state varchar(45) NOT NULL,
+  customer_zipcode varchar(45) NOT NULL,
+  PRIMARY KEY (`customer_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=12436 DEFAULT CHARSET=utf8;

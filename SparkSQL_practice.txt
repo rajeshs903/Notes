@@ -1,0 +1,172 @@
+
+
+/apps/hive/warehouse/spark_sql_practice_rajeshs.db/categories/categories.txt
+
+hive (default)> create database spark_sql_practice_rajeshs;
+OK
+Time taken: 2.046 seconds
+hive (default)> use spark_sql_practice_rajeshs;
+OK
+Time taken: 0.29 seconds
+hive (spark_sql_practice_rajeshs)>
+
+
+
+
+
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+
+mysql -u hr_user -h ms.itversity.com -p
+password : itversity
+
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| retail_db          |
+| retail_export      |
+| retail_import      |
++--------------------+
+4 rows in set (0.00 sec)
+
+
+mysql> use retail_db;
+
+
+mysql> show tables;
++---------------------+
+| Tables_in_retail_db |
++---------------------+
+| categories          |
+| customers           |
+| departments         |
+| order_items         |
+| orders              |
+| products            |
++---------------------+
+6 rows in set (0.00 sec)
+
+mysql> show create table categories;
++------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Table      | Create Table                                                                                                                                                                                                                                           |
++------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| categories | CREATE TABLE categories (
+  category_id int(11) NOT NULL AUTO_INCREMENT,
+  category_department_id int(11) NOT NULL,
+  category_name varchar(45) NOT NULL,
+  PRIMARY KEY (category_id)
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8 |
++------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+1 row in set (0.00 sec)
+
+
+CREATE TABLE categories (
+  category_id int,
+  category_department_id int ,
+  category_name String 
+) row format delimited fields terminated by ","
+stored as textfile;
+
+CREATE TABLE customers (
+  customer_id int ,
+  customer_fname String,
+  customer_lname String,
+  customer_email String,
+  customer_password String,
+  customer_street String,
+  customer_city String,
+  customer_state String,
+  customer_zipcode String)
+  row format delimited fields terminated by ","
+  stored as textfile;
+  
+
+   CREATE TABLE departments (
+  department_id int,
+  department_name String
+  ) row format delimited fields terminated by ","
+stored as textfile;
+
+
+CREATE TABLE order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float 
+  )  row format delimited fields terminated by ","
+  stored as textfile;
+  
+ CREATE TABLE orders (
+  order_id int,
+  order_date String,
+  order_customer_id int,
+  order_status String) 
+  row format delimited fields terminated by ","
+  stored as textfile;
+  
+  
+  CREATE TABLE products (
+  product_id int,
+  product_category_id int,
+  product_name String,
+  product_description String,
+  product_price float ,
+  product_image String)
+  row format delimited fields terminated by ","
+  stored as textfile;
+  
+  
+  
+  
+  Now we have tables created. We need to load the data into it.
+  we can do that either by 
+  
+  1)sqoop hive import
+  2)load command of hive 
+  
+  
+  first we will try with sqoop import :
+  
+  sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table customers \
+  --hive-import \
+  --hive-database spark_sql_practice_rajeshs \
+  --hive-table customers \
+  --num-mappers 1 
+
+// this job stuck   in accepted state. So using the load command of hive.
+
+categories
+customers
+departments
+order_items
+orders
+products
+
+
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/categories.txt' into table categories;
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/customers.txt' into table customers;
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/departments.txt' into table departments;
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/order_items.txt' into table order_items;
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/orders.txt' into table orders;
+  hive (spark_sql_practice_rajeshs)> load data local inpath '/home/rajeshs/retail_db_text/products.txt' into table products;
+
+  //the last one is loading with hdfs data instead of local path data and giving input file directory instead of direct input file path.
+  
+  
+  load data inpath '/public/retail_db/products/' into table products;
+  
+<<<<<<< HEAD
+  
+  
+=======
+  
+>>>>>>> master

@@ -1,0 +1,3182 @@
+
+
+spark-shell --master yarn --num-executors 10 --executor-memory 3G --packages com.databricks:spark-avro_2.10:2.0.1 --conf spark.ui.port=12229
+
+spark-shell --master yarn --num-executors 1 --executor-memory 512M --conf spark.ui.port=12229
+
+[rajeshs@gw02 ~]$ 
+spark-shell --master yarn --conf spark.ui.port=12229 --packages com.databricks:spark-avro_2.10:2.0.1
+
+sc.setLogLevel("ERROR")
+
+
+1)
+
+ Instructions
+Connect to the MySQL database on the itversity labs using sqoop and import all of the data from the orders table into HDFS
+
+Data Description
+A MySQL instance is running on a remote node ms.itversity.com in the instance. You will find a table that contains 68883 rows of orders data
+
+MySQL database information:
+
+Installation on the node ms.itversity.com
+Database name is retail_db
+Username: retail_user
+Password: itversity
+Table name orders
+Output Requirements
+Place the customer files in the HDFS directory
+/user/`whoami`/problem1/solution/
+Replace `whoami` with your OS user name
+Use a text format with comma as the columnar delimiter
+Load every order record completely
+End of Problem
+
+
+answer : 
+
+sqoop import \
+  --connect jdbc:mysql://nn01.itversity.com:3306/retail_db \
+
+
+sqoop import \
+--connect jdbc:mysql://ms.itversity.com/retail_db \
+--username retail_user \
+--P \
+--table orders \
+--target-dir /user/rajeshs/cca175/itversity_problems/problem1_lap/ \
+--as-textfile \
+--fields-terminated-by "," \
+--delete-target-dir
+
+
+
+output verify :
+
+hdfs dfs -ls /user/rajeshs/cca175/itversity_problems/problem1_lap/
+
+
+
+******************************************************************************************************************************
+
+
+
+spark-shell --master yarn --num-executors 1 --executor-memory 512M --conf spark.ui.port=12229
+
+
+
+
+use retail_db;
+
+select * from orders limit 10;
+select count(*) from orders ;
+select count(*) from customers ;
+
+
+select customer_lname ,customer_fname  from  customers left outer join orders on  customer_id = order_customer_id  order by customer_lname,customer_fname
+
+
+
+
+spark-shell --master yarn \
+--num-executors 1 \
+--executor-memory 512M \
+--conf spark.ui.port=12229
+
+
+i) Via RDD : 
+    val custRaw=scala.io.Source.fromFile("/data/retail_db/customers/part-00000").getLines.toList
+val customers=sc.parallelize(custRaw)
+customers.first 	//1,Richard,Hernandez,XXXXXXXXX,XXXXXXXXX,6303 Heather Plaza,Brownsville,TX,78521
+customers.count	//12435
+
+
+sc.setLogLevel("ERROR")
+val ordersRaw=scala.io.Source.fromFile("/data/retail_db/orders/part-00000").getLines.toList
+val orders=sc.parallelize(ordersRaw)
+orders.first	//1,2013-07-25 00:00:00.0,11599,CLOSED
+orders.count  //68883
+
+
+customers   	customer_id, customer_fname, customer_lname and many more
+orders 			order_id, order_date, order_customer_id, order_status
+
+
+val customersMap= customers.map(c=> {
+       val x=c.split(",")
+       (x(0).toInt,c)
+       })
+customersMap: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[10] at map at <console>:31	 
+
+val ordersMap= orders.map(order=> {
+          val x=order.split(",")
+          (x(0).toInt,order)
+          })
+ordersMap: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[9] at map at <console>:31
+
+ val customerOrderJoin= customersMap.leftOuterJoin(ordersMap)
+ 
+ 
+scala> customerOrderJoin.first
+res8: (Int, (String, Option[String])) = (5354,(5354,William,King,XXXXXXXXX,XXXXXXXXX,6229 Heather Butterfly Pathway,Caguas,PR,00725,Some(5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT)))
+
+
+val customersWhoNeverPlacedOrders= customerOrderJoin.filter(x=> x._2._2== None).map()
+val temp= customerOrderJoin.filter(x=>x._2._2==None).count
+
+temp1._2._2!=None
+
+  ii) Via Dataframe: 
+      scala> val ordersDF= orders.map(order=> {
+         val x=order.split(",")
+         (x(0).toInt,x(1),x(2).toInt,x(3))
+         }).toDF("order_id", "order_date", "order_customer_id", "order_status")
+
+	 
+scala> val customersDF= customers.map(c=> {
+          val x=c.split(",")
+          (x(0).toInt,x(1),x(2))
+          }).toDF("customer_id","customer_fname","customer_lname")
+
+	customersDF.show
+scala> customersDF.show(5)
++-----------+--------------+--------------+
+|customer_id|customer_fname|customer_lname|
++-----------+--------------+--------------+
+|          1|       Richard|     Hernandez|
+|          2|          Mary|       Barrett|
+|          3|           Ann|         Smith|
+|          4|          Mary|         Jones|
+|          5|        Robert|        Hudson|
++-----------+--------------+--------------+
+only showing top 5 rows
+
+scala> ordersDF.show(5)
++--------+--------------------+-----------------+---------------+
+|order_id|          order_date|order_customer_id|   order_status|
++--------+--------------------+-----------------+---------------+
+|       1|2013-07-25 00:00:...|            11599|         CLOSED|
+|       2|2013-07-25 00:00:...|              256|PENDING_PAYMENT|
+|       3|2013-07-25 00:00:...|            12111|       COMPLETE|
+|       4|2013-07-25 00:00:...|             8827|         CLOSED|
+|       5|2013-07-25 00:00:...|            11318|       COMPLETE|
++--------+--------------------+-----------------+---------------+
+only showing top 5 rows
+
+scala> customersDF.count
+res34: Long = 12435
+
+scala> ordersDF.count
+res35: Long = 68883
+
+scala> ordersDF.registerTempTable("orders")
+scala> customersDF.registerTempTable("customers")
+
+
+scala> sqlContext.sql("select * from orders o right join customers c on o.order_customer_id=c.customer_id where o.order_id is null order by customer_lname,customer_fname").show(10)
++--------+----------+-----------------+------------+-----------+--------------+--------------+
+|order_id|order_date|order_customer_id|order_status|customer_id|customer_fname|customer_lname|
++--------+----------+-----------------+------------+-----------+--------------+--------------+
+|    null|      null|             null|        null|       8343|          Mary|        Bolton|
+|    null|      null|             null|        null|       1808|        Albert|       Ellison|
+|    null|      null|             null|        null|       4927|       Carolyn|         Green|
+|    null|      null|             null|        null|        339|          Mary|        Greene|
+|    null|      null|             null|        null|        219|          Mary|       Harrell|
+|    null|      null|             null|        null|       9315|          Mary|         Lewis|
+|    null|      null|             null|        null|       8575|          Mary|       Mueller|
+|    null|      null|             null|        null|       9060|       Matthew|         Patel|
+|    null|      null|             null|        null|      10060|          Mary|          Shaw|
+|    null|      null|             null|        null|      12175|        Amanda|         Smith|
++--------+----------+-----------------+------------+-----------+--------------+--------------+
+only showing top 10 rows
+
+
+val result=sqlContext.sql("select customer_lname, customer_fname from orders o right join customers c on o.order_customer_id=c.customer_id where o.order_id is null order by customer_lname,customer_fname")
+coalesce
+
+
+result.map(x=>(x.mkString(","))).coalesce(1).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem2/solution/")
+
+
+verify the answer : 
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem2/solution/
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-09-30 05:19 /user/rajeshs/itv_problems_practice/problem2/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs        372 2018-09-30 05:19 /user/rajeshs/itv_problems_practice/problem2/solution/part-00000
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem2/solution/part-00000 | head                                  Bolton,Mary
+Ellison,Albert
+Green,Carolyn
+Greene,Mary
+Harrell,Mary
+Lewis,Mary
+Mueller,Mary
+Patel,Matthew
+Shaw,Mary
+Smith,Amanda
+
+
+******************************************************************************************************************************
+
+
+3)
+
+
+Instructions
+Get top 3 crime types based on number of incidents in RESIDENCE area using "Location Description"
+
+Data Description
+Data is available in HDFS under /public/crime/csv
+
+crime data information:
+
+Structure of data: (ID, Case Number, Date, Block, IUCR, Primary Type, Description, Location Description, Arrst, Domestic, Beat, District, Ward, Community Area, FBI Code, X Coordinate, Y Coordinate, Year, Updated on, Latitude, Longitude, Location)
+File format - text file
+Delimiter - "," (use regex while splitting split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1), as there are some fields with comma and enclosed using double quotes.
+Output Requirements
+Output Fields: crime_type, incident_count
+Output File Format: JSON
+Delimiter: N/A
+Compression: No
+Place the output file in the HDFS directory
+/user/`whoami`/problem3/solution/
+Replace `whoami` with your OS user name
+End of Problem
+/user/rajeshs/itv_problems_practice/problem3/solution/
+
+Answer :  
+
+scala> val crime=sc.textFile("/public/crime/csv")
+crime: org.apache.spark.rdd.RDD[String] = /public/crime/csv MapPartitionsRDD[4] at textFile at <console>:27
+
+scala> val header=crime.first
+header: String = ID,Case Number,Date,Block,IUCR,Primary Type,Description,Location Description,Arrest,Domestic,Beat,District,Ward,Community Area,FBI Code,X Coordinate,Y Coordinate,Year,Updated On,Latitude,Longitude,Location
+
+scala> val crimeData=crime.filter(x=>x!=header)
+crimeData: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[5] at filter at <console>:31
+
+scala> val crimeDF= crimeData.map(x=> {
+     |                  val c=x.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1)
+     |                  (c(0).toInt,c(1),c(5),c(7),1)
+     |                  }).toDF("ID","Case_Number", "Primary_Type",  "Location_Description","incident_count")
+crimeDF: org.apache.spark.sql.DataFrame = [ID: int, Case_Number: string, Primary_Type: string, Location_Description: string, incident_count: int]
+
+scala> crimeDF.show
++-------+-----------+-----------------+--------------------+--------------+
+|     ID|Case_Number|     Primary_Type|Location_Description|incident_count|
++-------+-----------+-----------------+--------------------+--------------+
+|5679862|   HN487108|  CRIMINAL DAMAGE|              STREET|             1|
+|5679863|   HN488302|          BATTERY|              STREET|             1|
+|5679864|   HN487195|          BATTERY|           RESIDENCE|             1|
+|5679865|   HN484199|            THEFT|              STREET|             1|
+|5679866|   HN489706|  CRIMINAL DAMAGE|           RESIDENCE|             1|
+|5679868|   HN479171|  CRIMINAL DAMAGE|              STREET|             1|
+|5679870|   HN487786|            THEFT|  GROCERY FOOD STORE|             1|
+|5679872|   HN489597|            THEFT|           APARTMENT|             1|
+|5679873|   HN488796|WEAPONS VIOLATION|       PARK PROPERTY|             1|
+|5679874|   HN486104|         BURGLARY|           APARTMENT|             1|
+|5679875|   HN485891|            THEFT|              STREET|             1|
+|5679876|   HN488180|          BATTERY|            SIDEWALK|             1|
+|5679877|   HN485606|            THEFT|              STREET|             1|
+|5679878|   HN459531|    OTHER OFFENSE|           APARTMENT|             1|
+|5679879|   HN485432|            THEFT|              STREET|             1|
+|5679881|   HN486824|            THEFT|  SMALL RETAIL STORE|             1|
+|5679882|   HN485055|          BATTERY|              STREET|             1|
+|5679885|   HN477072|        NARCOTICS|       CHA APARTMENT|             1|
+|5679887|   HN488976|          BATTERY|            SIDEWALK|             1|
+|5679888|   HN489702|    OTHER OFFENSE|           APARTMENT|             1|
++-------+-----------+-----------------+--------------------+--------------+
+only showing top 20 rows
+
+
+scala> crimeDF.registerTempTable("crime")
+
+
+
+scala> val result = sqlContext.sql("select Primary_Type,sum(incident_count) as total from crime where Location_Description='RESIDENCE' group by Primary_Type order by sum(incident_count) desc limit 3")
+result: org.apache.spark.sql.DataFrame = [Primary_Type: string, total: bigint]
+
+scala> result.show
++-------------+------+
+| Primary_Type| total|
++-------------+------+
+|      BATTERY|244394|
+|OTHER OFFENSE|184667|
+|        THEFT|142273|
++-------------+------+
+
+result.write.json("/user/rajeshs/itv_problems_practice/problem3/solution/")
+
+
+verify the answer : 
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem3/solution/part-r-00000-d220ad5d-c4ec-4af4-bdf0-42d6b09f5c6b  | head
+
+{"Primary_Type":"BATTERY","total":244394}
+{"Primary_Type":"OTHER OFFENSE","total":184667}
+{"Primary_Type":"THEFT","total":142273}
+
+
+******************************************************************************************************************************
+
+4)
+
+
+Instructions
+Convert NYSE data into parquet
+
+NYSE data Description
+	Data is available in local file system under /data/nyse (ls -ltr /data/nyse)
+
+NYSE Data information:
+
+Fields (stockticker:string, transactiondate:string, openprice:float, highprice:float, lowprice:float, closeprice:float, volume:bigint)
+Output Requirements
+Column Names: stockticker, transactiondate, openprice, highprice, lowprice, closeprice, volume
+Convert file format to parquet
+Place the output file in the HDFS directory
+/user/`whoami`/problem4/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+
+Answer :
+
+[rajeshs@gw02 data]$ hdfs dfs -put nyse /user/rajeshs/data_from_local/
+
+Fields (stockticker:String, transactiondate:String, openprice:Float, highprice:Float, lowprice:Float, closeprice:Float, volume:BigInt)
+
+[rajeshs@gw02 data]$ hdfs dfs -ls /user/rajeshs/data_from_local/nyse
+
+
+scala> val nyseRDD= sc.textFile("/user/rajeshs/data_from_local/nyse")
+nyseRDD: org.apache.spark.rdd.RDD[String] = /user/rajeshs/data_from_local/nyse MapPartitionsRDD[96] at textFile at <console>:27
+
+scala> nyseRDD.first
+res25: String = AA,19970101,47.82,47.82,47.82,47.82,0
+
+Fields (stockticker:String, transactiondate:String, openprice:Float, highprice:Float, lowprice:Float, closeprice:Float, volume:BigInt)
+
+val nyseRDD= sc.textFile("/user/rajeshs/data_from_local/nyse")
+
+
+val nyseDF= nyseRDD.map(rec => {
+val x = rec.split(",")
+(x(0),x(1),x(2).toFloat,x(3).toFloat,x(4).toFloat,x(5).toFloat,x(6).toLong)
+}).toDF("stockticker", "transactiondate", "openprice", "highprice", "lowprice", "closeprice","volume")
+
++-----------+---------------+---------+---------+--------+----------+------+
+|stockticker|transactiondate|openprice|highprice|lowprice|closeprice|volume|
++-----------+---------------+---------+---------+--------+----------+------+
+|         AA|       19970101|    47.82|    47.82|   47.82|     47.82|     0|
+|        ABC|       19970101|     6.03|     6.03|    6.03|      6.03|     0|
+|        ABM|       19970101|     9.25|     9.25|    9.25|      9.25|     0|
+|        ABT|       19970101|    25.37|    25.37|   25.37|     25.37|     0|
+|        ABX|       19970101|    28.75|    28.75|   28.75|     28.75|     0|
+|        ACP|       19970101|     9.12|     9.12|    9.12|      9.12|     0|
+|        ACV|       19970101|     16.0|     16.0|    16.0|      16.0|     0|
+|        ADC|       19970101|    21.37|    21.37|   21.37|     21.37|     0|
+|        ADM|       19970101|    17.24|    17.24|   17.24|     17.24|     0|
+|        ADX|       19970101|    13.16|    13.16|   13.16|     13.16|     0|
+|        AED|       19970101|     31.5|     31.5|    31.5|      31.5|     0|
+|        AEE|       19970101|     38.5|     38.5|    38.5|      38.5|     0|
+|        AEG|       19970101|     15.2|     15.2|    15.2|      15.2|     0|
+|        AEM|       19970101|     14.0|     14.0|    14.0|      14.0|     0|
+|        AEP|       19970101|    41.12|    41.12|   41.12|     41.12|     0|
+|        AES|       19970101|    11.62|    11.62|   11.62|     11.62|     0|
+|         AF|       19970101|    12.29|    12.29|   12.29|     12.29|     0|
+|        AFG|       19970101|   25.179|   25.179|  25.179|    25.179|     0|
+|        AFL|       19970101|    10.69|    10.69|   10.69|     10.69|     0|
+|         AG|       19970101|    28.62|    28.62|   28.62|     28.62|     0|
++-----------+---------------+---------+---------+--------+----------+------+
+only showing top 20 rows
+
+scala> nyseDF.coalesce(1).write.parquet("/user/rajeshs/itv_problems_practice/problem4/solution")
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+
+
+
+verify the answer:
+
+
+<<<<<<< HEAD
+sqlContext.read.parquet("/user/rajeshs/itv_problems_practice/problem4/solution").show
+=======
+sqlContext.read.parquet("/user/rajeshs/itv_problems_practice/problem4/solution").show
+
+******************************************************************************************************************************
+
+5) 
+
+
+Instructions
+Get word count for the input data using space as delimiter (for each word, we need to get how many times it is repeated in the entire input data set)
+
+Data Description
+Data is available in HDFS /public/randomtextwriter
+
+word count data information:
+
+Number of executors should be 10
+executor memory should be 3 GB
+Executor cores should be 20 in total (2 per executor)
+Number of output files should be 8
+Avro dependency details: groupId -> com.databricks, artifactId -> spark-avro_2.10, version -> 2.0.1
+Output Requirements
+Output File format: Avro
+Output fields: word, count
+Compression: Uncompressed
+Place the customer files in the HDFS directory
+/user/`whoami`/problem5/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+
+Answer :
+
+spark-shell --master yarn --num-executors 10 --executor-memory 3G --packages com.databricks:spark-avro_2.10:2.0.1
+
+scala> val textRDD = sc.textFile("/public/randomtextwriter")
+textRDD: org.apache.spark.rdd.RDD[String] = /public/randomtextwriter MapPartitionsRDD[5] at textFile at <console>:31
+
+scala> textRDD.first
+res7: String = SEQ??org.apache.hadoop.io.Text?org.apache.hadoop.io.Text??????�g??1��J$�ג?d�????�???XWpterostigma steprelationship pleasurehood abusiveness seelful unstipulated winterproof �?gmericarp pentosuria airfreighter orthopedical symbiogenetically Hu unrepealably Gothish unachievable saguran extraorganismal defensibly taver cubby uniarticular allegedly Isokontae trabecular uniarticular diminutively epidymides engrain yawler bunghole Munnopsidae coadvice tonsure inexistency theologicopolitical unsupercilious porriginous reformatory winterproof lyrebird bestill oflete agglomeratic abstractionism dermorhynchous Eryon approbation uninductive pachydermous ipomoein cretaceous helpless heliocentricism tingly Eleusinian Zuludom hemimelus serosanguineous Italical eristically trillium over...
+scala>
+
+
+scala> val textMap=  textRDD.flatMap(x=>x.split(" ")).map(x=>(x,1)).reduceByKey((x,y)=>(x+y))
+textMap: org.apache.spark.rdd.RDD[(String, Int)] = ShuffledRDD[4] at reduceByKey at <console>:29
+
+scala> textMap.first
+res1: (String, Int) = (????????>unexplicit,2)
+
+scala> val sortedWordCount = textMap.map(x=>((-x._2,x._1),x)).sortByKey()
+finalResult: org.apache.spark.rdd.RDD[((Int, String), (String, Int))] = ShuffledRDD[26] at sortByKey at <console>:37
+
+
+scala> sortedWordCount.map(x=>x._2).first
+18/09/30 12:08:28 ERROR Executor: Managed memory leak detected; size = 36910952 bytes, TID = 2171
+res28: (String, Int) = (ineunt,2930908)
+
+scala> val wordCountDF = sortedWordCount.toDF("word","count")		 //no need of map since it is already (String,Int) tuple
+wordCountDF: org.apache.spark.sql.DataFrame = [word: struct<_1:int,_2:string>, count: struct<_1:string,_2:int>]
+
+/* do not forget ._ at end of the import */
+
+scala> import com.databricks.spark.avro._
+import com.databricks.spark.avro._
+
+
+wordCountDF.coalesce(1).write.avro("/user/rajeshs/itv_problems_practice/problem5/solution")
+
+
+verify the answer : 
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem5/solution"
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-09-30 14:47 /user/rajeshs/itv_problems_practice/problem5/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs  430738926 2018-09-30 14:47 /user/rajeshs/itv_problems_practice/problem5/solution/part-r-00000-c0bb0c43-e6e0-4e41-8d63-0caf93e0b167.avro
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem5/solution/part-r-00000-c0bb0c43-e6e0-4e41-8d63-0caf93e0b167.avro |head
+Objavro.schema▒{"type":"record","name":"topLevelRecord","fields":[{"name":"word","type":[{"type":"record","name":"word","fields":[{"name":"_1","type":["int","null"]},{"name":"_2","type":["string","null"]}]},"null"]},{"name":"count","type":[{"type":"record","name":"count","fields":[{"name":"_1","type":["string","null"]},{"name":"_2","type":["int","null"]}]},"null"]}]}avro.codec
+snappy▒8▒▒▒ޮ▒▒+▒▒▒▒▒▒▒▒8▒▒▒
+▒▒@tingly8▒▒▒imp▒@▒▒▒dialoguer.
+▒L▒▒▒osteopaedion:▒"▒
+▒▒!(bacilliteradametricalB▒▒▒p$ethmopalat*6▒▒▒((veterinaria▒2▒"▒,euphemious2
+▒▒(LincolnlikJ.▒▒▒▒$balladmong!▒6▒▒▒▒refectiv▒
+
+******************************************************************************************************************************
+6)
+
+
+Instructions
+Get total number of orders for each customer where the cutomer_state = 'TX'
+
+Data Description
+retail_db data is available in HDFS at /public/retail_db
+
+retail_db data information:
+
+Source directories: /public/retail_db/orders and /public/retail_db/customers
+Source Columns - orders - order_id, order_date, order_customer_id, order_status
+Source Columns - customers - customer_id, customer_fname, customer_lname, customer_state (8th column) and many more
+delimiter: (",")
+Output Requirements
+Output Fields: customer_fname, customer_lname, order_count
+File Format: text
+Delimiter: Tab character (\t)
+Place the result file in the HDFS directory
+/user/`whoami`/problem6/solution/
+Replace `whoami` with your OS user name
+End of Problem 
+
+
+Answer :
+
+sc.setLogLevel("ERROR")
+
+val orders = sc.textFile("/public/retail_db/orders")
+val customers = sc.textFile("/public/retail_db/customers")
+
+
+scala> orders.first
+res1: String = 1,2013-07-25 00:00:00.0,11599,CLOSED
+
+scala> customers.first
+res2: String = 1,Richard,Hernandez,XXXXXXXXX,XXXXXXXXX,6303 Heather Plaza,Brownsville,TX,78521
+
+
+scala> val ordersDF= orders.map(x=> {
+      val o=x.split(",")
+      (o(0).toInt,o(2).toInt)
+      }).toDF("order_id", "order_customer_id")
+ordersDF: org.apache.spark.sql.DataFrame = [order_id: int, order_customer_id: int]
+
+scala> ordersDF.show(3)
++--------+-----------------+
+|order_id|order_customer_id|
++--------+-----------------+
+|       1|            11599|
+|       2|              256|
+|       3|            12111|
++--------+-----------------+
+only showing top 3 rows
+
+
+scala> val customersDF= customers.map(x=> {
+      val c=x.split(",")
+      (c(0).toInt,c(1),c(2),c(7))
+      }).toDF("customer_id","customer_fname","customer_lname","customer_state")
+customersDF: org.apache.spark.sql.DataFrame = [customer_id: int, customer_fname: string, customer_lname: string, customer_state: string]
+
+scala> customersDF.show(2)
++-----------+--------------+--------------+--------------+
+|customer_id|customer_fname|customer_lname|customer_state|
++-----------+--------------+--------------+--------------+
+|          1|       Richard|     Hernandez|            TX|
+|          2|          Mary|       Barrett|            CO|
++-----------+--------------+--------------+--------------+
+only showing top 2 rows
+
+
+
+scala> ordersDF.registerTempTable("orders")
+
+scala> customersDF.registerTempTable("customers")
+
+scala> val ordersCountofEachCustomerDF= sqlContext.sql("select customer_fname ,customer_lname ,count(distinct order_id) order_count from  customers  join orders on customer_id = order_customer_id where customer_state  = 'TX' group by customer_fname ,customer_lname ")
+
+ordersCountofEachCustomerDF: org.apache.spark.sql.DataFrame = [customer_fname: string, customer_lname: string, order_count: bigint]
+
++--------------+--------------+-----------+
+|customer_fname|customer_lname|order_count|
++--------------+--------------+-----------+
+|          Mary|        Little|         13|
+|          Mary|     Christian|          5|
+|         Jason|         Smith|         12|
+|          Mary|     Schroeder|          5|
+|          Mary|      Shepherd|          4|
+|         Donna|      Bautista|          5|
+|        Joseph|    Pennington|          3|
+|          Juan|         Smith|          6|
+|           Roy|         Smith|         15|
++--------------+--------------+-----------+
+
+
+
+ordersCountofEachCustomerDF.coalesce(1).map(x=> x.mkString("\t")).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem6/solution")
+
+
+verify the answer :
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem6/solution/part-00000 | head
+Mary    Little  13
+Mary    Christian       5
+Jason   Smith   12
+Mary    Shepherd        4
+Mary    Schroeder       5
+Donna   Bautista        5
+Juan    Smith   6
+Joseph  Pennington      3
+Melissa Benitez 3
+Roy     Smith   15
+[rajeshs@gw02 ~]$
+
+******************************************************************************************************************************
+7)
+
+Instructions
+List the names of the Top 5 products by revenue ordered on '2013-07-26'. Revenue is considered only for COMPLETE and CLOSED orders.
+
+Data Description
+retail_db data is available in HDFS at /public/retail_db
+
+retail_db data information:
+
+Source directories: 
+/public/retail_db/orders 
+/public/retail_db/order_items 
+/public/retail_db/products
+Source delimiter: comma(",")
+Source Columns - orders - order_id, order_date, order_customer_id, order_status
+Source Columns - order_itemss - order_item_id, order_item_order_id, order_item_product_id, order_item_quantity, order_item_subtotal, order_item_product_price
+Source Columns - products - product_id, product_category_id, product_name, product_description, product_price, product_image
+Output Requirements
+Target Columns: order_date, order_revenue, product_name, product_category_id
+Data has to be sorted in descending order by order_revenue
+File Format: text
+Delimiter: colon (:)
+Place the output file in the HDFS directory
+/user/`whoami`/problem7/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+
+"order_id","order_date","order_customer_id","order_status"
+"order_item_id","order_item_order_id","order_item_product_id","order_item_quantity","order_item_subtotal","order_item_product_price"
+"product_id","product_category_id","product_name","product_description","product_price","product_image"
+
+Answer :
+
+
+val orders=sc.textFile("/public/retail_db/orders")
+val order_items=sc.textFile("/public/retail_db/order_items")
+val products=sc.textFile("/public/retail_db/products")
+
+
+scala> val orders=sc.textFile("/public/retail_db/orders")
+orders: org.apache.spark.rdd.RDD[String] = /public/retail_db/orders MapPartitionsRDD[284] at textFile at <console>:27
+
+scala> val order_items=sc.textFile("/public/retail_db/order_items")
+order_items: org.apache.spark.rdd.RDD[String] = /public/retail_db/order_items MapPartitionsRDD[286] at textFile at <console>:27
+
+scala> val products=sc.textFile("/public/retail_db/products")
+products: org.apache.spark.rdd.RDD[String] = /public/retail_db/products MapPartitionsRDD[288] at textFile at <console>:27
+
+List the names of the Top 5 products by revenue ordered on '2013-07-26'. Revenue is considered only for COMPLETE and CLOSED orders.
+
+
+orders 			- order_id, order_date, order_customer_id, order_status
+order_itemss 	- order_item_id, order_item_order_id, order_item_product_id, order_item_quantity, order_item_subtotal, order_item_product_price
+products 		- product_id, product_category_id, product_name, product_description, product_price, product_image
+
+
+scala> 
+
+val ordersDF = orders.map(o => {
+      val x=o.split(",")
+      (x(0).toInt,x(1),x(3))
+      })toDF("order_id","order_date","order_status")
+
+	  ordersDF: org.apache.spark.sql.DataFrame = [order_id: int, order_date: string, order_status: string]
+
+scala> ordersDF.show(3)
++--------+--------------------+---------------+
+|order_id|          order_date|   order_status|
++--------+--------------------+---------------+
+|       1|2013-07-25 00:00:...|         CLOSED|
+|       2|2013-07-25 00:00:...|PENDING_PAYMENT|
+|       3|2013-07-25 00:00:...|       COMPLETE|
++--------+--------------------+---------------+
+only showing top 3 rows
+
+
+scala>
+ val order_itemsDF = order_items.map( oi => {
+      val x = oi.split(",")
+      (x(1).toInt,x(2).toInt,x(4).toFloat,x(5).toFloat)
+      }).toDF("order_item_order_id","order_item_product_id","order_item_subtotal","order_item_product_price")
+	 
+order_itemsDF: org.apache.spark.sql.DataFrame = [order_item_order_id: int, order_item_product_id: int, order_item_subtotal: float, order_item_product_price: float]
+
+
+scala> order_itemsDF.show(3)
++-------------------+---------------------+-------------------+------------------------+
+|order_item_order_id|order_item_product_id|order_item_subtotal|order_item_product_price|
++-------------------+---------------------+-------------------+------------------------+
+|                  1|                  957|             299.98|                  299.98|
+|                  2|                 1073|             199.99|                  199.99|
+|                  2|                  502|              250.0|                    50.0|
++-------------------+---------------------+-------------------+------------------------+
+only showing top 3 rows
+
+
+scala> 
+val productsDF = products.map( p => {
+           val x = p.split(",")
+           (x(0).toInt,x(1).toInt,x(2),x(4).toFloat)
+           }).toDF("product_id","product_category_id","product_name","product_price")
+productsDF: org.apache.spark.sql.DataFrame = [product_id: int, product_category_id: int, product_name: string, product_price: float]
+
+scala> productsDF.show(3)
++----------+-------------------+--------------------+-------------+
+|product_id|product_category_id|        product_name|product_price|
++----------+-------------------+--------------------+-------------+
+|         1|                  2|Quest Q64 10 FT. ...|        59.98|
+|         2|                  2|Under Armour Men'...|       129.99|
+|         3|                  2|Under Armour Men'...|        89.99|
++----------+-------------------+--------------------+-------------+
+only showing top 3 rows
+	 
+
+ordersDF.registerTempTable("orders")
+order_itemsDF.registerTempTable("order_items")
+productsDF.registerTempTable("products")
+
+
+
+
+
+scala> ordersDF.count
+res41: Long = 68883
+
+scala> ordersDF.where("order_status in ('COMPLETE','CLOSED')").count
+res43: Long = 30455
+
+scala> ordersDF.where("order_status in ('COMPLETE')").count
+res44: Long = 22899
+
+scala> val orderDF_filtered= ordersDF.where("order_status in ('COMPLETE','CLOSED')")
+orderDF_filtered: org.apache.spark.sql.DataFrame = [order_id: int, order_date: string, order_status: string]
+
+scala> orderDF_filtered.registerTempTable("orders1")
+
+
+scala> orderDF_filtered.show(3,false)
++--------+---------------------+------------+
+|order_id|order_date           |order_status|
++--------+---------------------+------------+
+|3       |2013-07-25 00:00:00.0|COMPLETE    |
+|5       |2013-07-25 00:00:00.0|COMPLETE    |
+|6       |2013-07-25 00:00:00.0|COMPLETE    |
++--------+---------------------+------------+
+only showing top 3 rows
+
+orderDF_filtered.select(substring(col("order_date"), 1, 10)='2013-07-26')
+
+scala> sqlContext.sql("select * from orders where order_status='CLOSED' ").count
+res21: Long = 7556
+
+scala> sqlContext.sql("select * from orders where order_status='COMPLETE' ").count
+res22: Long = 22899
+
+// subsrting the date from timestamp (optional)
+val orderDF_filtered = sqlContext.sql("select order_id,substring(order_date,1,10) as order_date_1,order_status from orders1  ")
+
+scala> orderDF_filtered.show
++--------+------------+------------+
+|order_id|order_date_1|order_status|
++--------+------------+------------+
+|       1|  2013-07-25|      CLOSED|
+|       3|  2013-07-25|    COMPLETE|
+|       4|  2013-07-25|      CLOSED|
+|       5|  2013-07-25|    COMPLETE|
+
+
+
+scala> orderDF_filtered.registerTempTable("orders1")
+
+
+http://kirillpavlov.com/blog/2016/04/23/beyond-traditional-join-with-apache-spark/
+
+
+
+scala> sqlContext.sql("select oi.order_item_product_id,o.order_id,o.order_date, o.order_status, sum(oi.order_item_subtotal) over (PARTITION BY o.order_date) as order_revenue from orders1 o join order_items oi on o.order_id = oi.order_item_order_id ").show
++---------------------+--------+--------------------+------------+------------------+
+|order_item_product_id|order_id|          order_date|order_status|     order_revenue|
++---------------------+--------+--------------------+------------+------------------+
+|                  311|   67036|2014-07-11 00:00:...|      CLOSED|29596.320642471313|
+|                 1004|   67036|2014-07-11 00:00:...|      CLOSED|29596.320642471313|
+|                  957|   67036|2014-07-11 00:00:...|      CLOSED|29596.320642471313|
+|                  191|   67037|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  365|   67037|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  957|   67037|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1004|   67037|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1014|   67037|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  365|   55471|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  957|   55471|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  627|   55482|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1004|   55482|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  502|   55482|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  403|   55482|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1073|   55491|2014-07-11 00:00:...|      CLOSED|29596.320642471313|
+|                  191|   55495|2014-07-11 00:00:...|      CLOSED|29596.320642471313|
+|                 1014|   55512|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                  627|   55512|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1004|   55512|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
+|                 1073|   55515|2014-07-11 00:00:...|    COMPLETE|29596.320642471313|
++---------------------+--------+--------------------+------------+------------------+
+
+
+
+
+scala> 
+val ordersJoinedOrderItemsDF = sqlContext.sql("select oi.order_item_product_id,o.order_id,substring(order_date,1,10) as order_date, o.order_status, round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) order_revenue from orders1 o join order_items oi on o.order_id = oi.order_item_order_id ")
+
+ordersJoinedOrderItemsDF: org.apache.spark.sql.DataFrame = [order_item_product_id: int, order_id: int, order_date: string, order_status: string, order_revenue: double]
+
+scala> ordersJoinedOrderItemsDF.where("order_id=67037").show
++---------------------+--------+----------+------------+------------------+
+|order_item_product_id|order_id|order_date|order_status|     order_revenue|
++---------------------+--------+----------+------------+------------------+
+|                  191|   67037|2014-07-11|    COMPLETE|29596.320642471313|
+|                  365|   67037|2014-07-11|    COMPLETE|29596.320642471313|
+|                  957|   67037|2014-07-11|    COMPLETE|29596.320642471313|
+|                 1004|   67037|2014-07-11|    COMPLETE|29596.320642471313|
+|                 1014|   67037|2014-07-11|    COMPLETE|29596.320642471313|
++---------------------+--------+----------+------------+------------------+
+round(sum(oi.order_item_subtotal), 2) order_revenue
+
+ val ordersJoinedOrderItemsDF1 = sqlContext.sql("select oi.order_item_product_id,o.order_id,substring(order_date,1,10) as order_date, o.order_status, sum(oi.order_item_subtotal) over (PARTITION BY o.order_date,order_status) as order_revenue from orders1 o join order_items oi on o.order_id = oi.order_item_order_id ")
+
+
+scala> ordersJoinedOrderItemsDF1.show(3,false)
++---------------------+--------+----------+------------+------------------+
+|order_item_product_id|order_id|order_date|order_status|order_revenue     |
++---------------------+--------+----------+------------+------------------+
+|191                  |67037   |2014-07-11|COMPLETE    |29596.320642471313|
+|365                  |67037   |2014-07-11|COMPLETE    |29596.320642471313|
+|957                  |67037   |2014-07-11|COMPLETE    |29596.320642471313|
++---------------------+--------+----------+------------+------------------+
+only showing top 3 rows
+
+
+scala> ordersJoinedOrderItemsDF.where("order_id=67037").show
++---------------------+--------+----------+------------+-----------------+
+|order_item_product_id|order_id|order_date|order_status|    order_revenue|
++---------------------+--------+----------+------------+-----------------+
+|                  191|   67037|2014-07-11|    COMPLETE|21528.33048057556|
+|                  365|   67037|2014-07-11|    COMPLETE|21528.33048057556|
+|                  957|   67037|2014-07-11|    COMPLETE|21528.33048057556|
+|                 1004|   67037|2014-07-11|    COMPLETE|21528.33048057556|
+|                 1014|   67037|2014-07-11|    COMPLETE|21528.33048057556|
++---------------------+--------+----------+------------+-----------------+
+
+scala> ordersJoinedOrderItemsDF.registerTempTable("orderResults")
+
+ 
+scala> val result = sqlContext.sql("select oi.order_date,round(oi.order_revenue,2) order_revenue,p.product_name,p.product_category_id from products p join orderResults oi on oi.order_item_product_id= p.product_id where oi.order_date='2013-07-26' order by oi.order_revenue desc limit 5")
+
+result: org.apache.spark.sql.DataFrame = [order_date: string, order_revenue: double, product_name: string, product_category_id: int]
+
+
+scala> result.rdd.map(x=>x.mkString(":")).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem7/solution")
+
+verify answer :
+
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem7/solution").take(5).foreach(println)
+2013-07-26:1239.87:Field & Stream Sportsman 16 Gun Fire Safe:45
+2013-07-26:1239.87:Perfect Fitness Perfect Rip Deck:17
+2013-07-26:1239.87:Nike Men's Free 5.0+ Running Shoe:9
+2013-07-26:1239.87:Under Armour Girls' Toddler Spine Surge Runni:29
+2013-07-26:1159.9:Nike Men's CJ Elite 2 TD Football Cleat:18
+
+
+******************************************************************************************************************************
+
+Instructions
+List the order Items where the order_status = 'PENDING PAYMENT' order by order_id
+
+Data Description
+Data is available in HDFS location
+
+retail_db data information:
+
+Source directories: /data/retail_db/orders
+Source delimiter: comma(",")
+Source Columns - orders - order_id, order_date, order_customer_id, order_status
+Output Requirements
+Target columns: order_id, order_date, order_customer_id, order_status
+File Format: orc
+Place the output files in the HDFS directory
+/user/`whoami`/problem8/solution/
+/user/rajeshs/itv_problems_practice/problem8/solution
+Replace `whoami` with your OS user name
+End of Problem
+
+Answer :
+
+scala> val orders=sc.textFile("/public/retail_db/orders")
+orders: org.apache.spark.rdd.RDD[String] = /public/retail_db/orders MapPartitionsRDD[93] at textFile at <console>:27
+
+
+
+orders.first
+res1: String = 1,2013-07-25 00:00:00.0,11599,CLOSED
+
+
+"order_id","order_date","order_customer_id","order_status"
+scala> 
+val ordersDF = orders.map( x=> {
+       val o = x.split(",")
+       (o(0).toInt,o(1),o(2).toInt,o(3))
+    })toDF("order_id","order_date","order_customer_id","order_status")
+	
+res4: org.apache.spark.sql.DataFrame = [order_id: int, order_date: string, order_customer_id: int, order_status: string]
+
+
+scala> val ordersPendingPaymentDF  =ordersDF.where("order_status = 'PENDING_PAYMENT'").orderBy("order_id")
+ordersPendingPaymentDF: org.apache.spark.sql.DataFrame = [order_id: int, order_date: string, order_customer_id: int, order_status: string]
+
+scala> ordersPendingPaymentDF.show
++--------+--------------------+-----------------+---------------+
+|order_id|          order_date|order_customer_id|   order_status|
++--------+--------------------+-----------------+---------------+
+|       2|2013-07-25 00:00:...|              256|PENDING_PAYMENT|
+|       9|2013-07-25 00:00:...|             5657|PENDING_PAYMENT|
+|      10|2013-07-25 00:00:...|             5648|PENDING_PAYMENT|
+|      13|2013-07-25 00:00:...|             9149|PENDING_PAYMENT|
+|      16|2013-07-25 00:00:...|             7276|PENDING_PAYMENT|
+|      19|2013-07-25 00:00:...|             9488|PENDING_PAYMENT|
+|      23|2013-07-25 00:00:...|             4367|PENDING_PAYMENT|
+
+i)
+
+ordersPendingPaymentDF.write.orc("/user/rajeshs/itv_problems_practice/problem8/solution")
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem8/solution                                                     Found 201 items
+
+or
+ii)
+scala> ordersPendingPaymentDF.write.format("orc").save("/user/rajeshs/itv_problems_practice/problem8/solution2")
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem8/solution2 |wc -l
+202
+
+//creating 201 files because spark.sql.shuffle.partitions by default 200.
+
+scala> sqlContext.getConf("spark.sql.shuffle.partitions")
+res14: String = 200
+
+
+if you want to set it as per your requirements:
+
+scala> sqlContext.setConf("spark.sql.shuffle.partitions","4")
+
+scala> sqlContext.getConf("spark.sql.shuffle.partitions")
+res17: String = 4
+
+
+
+
+verify the answer :
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem8/solution
+Found 3 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-02 10:18 /user/rajeshs/itv_problems_practice/problem8/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs      20302 2018-10-02 10:18 /user/rajeshs/itv_problems_practice/problem8/solution/part-r-00000-c2172cb3-0974-41b0-bac9-44f1a30aaaa8.orc
+-rw-r--r--   2 rajeshs hdfs      21148 2018-10-02 10:18 /user/rajeshs/itv_problems_practice/problem8/solution/part-r-00001-c2172cb3-0974-41b0-bac9-44f1a30aaaa8.orc
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem8/solution/part-r-00000-c2172cb3-0974-41b0-bac9-44f1a30aaaa8.orc | head
+ORC                                                                                                                                     
+
+
+small demonstration :
+
+sqlContext.setConf("spark.sql.shuffle.partitions","200")
+val ordersPendingPaymentDF  =ordersDF.where("order_status = 'PENDING_PAYMENT'") // no order by here 
+ordersPendingPaymentDF.write.format("orc").save("/user/rajeshs/itv_problems_practice/problem8/solution2")
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem8/solution2 |wc -l
+4
+
+val ordersPendingPaymentOrderedByDF  =ordersDF.where("order_status = 'PENDING_PAYMENT'").orderBy("order_id").orderBy("order_id")
+ordersPendingPaymentDF  =ordersDF.where("order_status = 'PENDING_PAYMENT'").orderBy("order_id")
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem8/solution3 |wc -l
+202
+
+
+so with same number of default partitions, ordersPendingPaymentDF gives 4 partitions(files) whereas ordersPendingPaymentOrderedByDF gives 201 partitions
+
+sqlContext.setConf("spark.default.parallelism","500")
+
+
+
+******************************************************************************************************************************
+
+9)
+
+
+Instructions
+Remove header from h1b data
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS location: /public/h1b/h1b_data
+First record is the header for the data
+Output Requirements
+Remove the header from the data and save rest of the data as is
+Data should be compressed using snappy algorithm
+Place the H1B data in the HDFS directory
+/user/`whoami`/problem9/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+Answer : 
+
+scala> h1b.first
+res3: String = ?CASE_STATUS?EMPLOYER_NAME?SOC_NAME?JOB_TITLE?FULL_TIME_POSITION?PREVAILING_WAGE?YEAR?WORKSITE?lon?lat
+scala> val h1b= sc.textFile("/public/h1b/h1b_data")
+h1b: org.apache.spark.rdd.RDD[String] = /public/h1b/h1b_data MapPartitionsRDD[5] at textFile at <console>:27
+
+scala> val header = h1b.first
+header: String = ?CASE_STATUS?EMPLOYER_NAME?SOC_NAME?JOB_TITLE?FULL_TIME_POSITION?PREVAILING_WAGE?YEAR?WORKSITE?lon?lat
+scala> val h1bWithoutHeader = h1b.filter(x=> x!=header)
+h1bWithoutHeader: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[6] at filter at <console>:31
+
+scala> h1bWithoutHeader.first
+res4: String = 1?CERTIFIED-WITHDRAWN?UNIVERSITY OF MICHIGAN?BIOCHEMISTS AND BIOPHYSICISTS?POSTDOCTORAL RESEARCH FELLOW?N?36067?2016?ANN ARBOR, MICHIGAN?-83.7430378?42.2808256
+scala> h1bWithoutHeader.count
+res5: Long = 3002458
+
+scala> h1b.count
+res6: Long = 3002459
+
+
+/*
+org.apache.hadoop.io.compress.SnappyCodec
+org.apache.hadoop.io.compress.GzipCodec
+org.apache.hadoop.io.compress.DefaultCodec
+*/
+
+
+h1bWithoutHeader.saveAsTextFile("/user/rajeshs/itv_problems_practice/problem9/solution/",classOf[org.apache.hadoop.io.compress.SnappyCodec])
+
+verify the answer :
+
+ h1bWithoutHeader.saveAsTextFile("/user/rajeshs/itv_problems_practice/problem9/solution/",classOf[org.apache.hadoop.io.compress.SnappyCodec])
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem9/solution/part-00000.snappy").take(3).foreach(println)
+1CERTIFIED-WITHDRAWNUNIVERSITY OF MICHIGANBIOCHEMISTS AND BIOPHYSICISTSPOSTDOCTORAL RESEARCH FELLOWN360672016ANN ARBOR, MICHIGAN-83.743037842.2808256
+2CERTIFIED-WITHDRAWNGOODMAN NETWORKS, INC.CHIEF EXECUTIVESCHIEF OPERATING OFFICERY2426742016PLANO, TEXAS-96.698885633.0198431
+3CERTIFIED-WITHDRAWNPORTS AMERICA GROUP, INC.CHIEF EXECUTIVESCHIEF PROCESS OFFICERY1930662016JERSEY CITY, NEW JERSEY-74.077641740.7281575
+
+
+******************************************************************************************************************************
+
+
+10 ) 
+
+Instructions
+Get number of LCAs filed for each year
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data
+Ignore first record which is header of the data
+YEAR is 8th field in the data
+There are some LCAs for which YEAR is NA, ignore those records
+Output Requirements
+File Format: text
+Output Fields: YEAR, NUMBER_OF_LCAS
+Delimiter: Ascii null "\0"
+Place the output files in the HDFS directory
+/user/`whoami`/problem10/solution/
+Replace `whoami` with your OS user name
+End of Problem
+/user/rajeshs/itv_problems_practice/problem10/solution/
+
+Answer :
+
+ val h1b_data = sc.textFile("/public/h1b/h1b_data")
+
+ val header = h1b_data.first
+header: String = ?CASE_STATUS?EMPLOYER_NAME?SOC_NAME?JOB_TITLE?FULL_TIME_POSITION?PREVAILING_WAGE?YEAR?WORKSITE?lon?lat
+scala> val h1b_without_header = h1b_data.filter(x=> x!= header)
+h1b_without_header: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[12] at filter at <console>:31
+
+
+
+scala> h1b_without_header.count
+res11: Long = 3002458
+
+scala> h1b_data.count
+res12: Long = 3002459
+
+
+scala> val h1bKey = h1b_without_header.filter(x=>x.split("\0")(7)!="NA").
+     | map(x=> {
+     | val h = x.split("\0")
+     | (h(7).toInt,1)}).
+     | reduceByKey((x,y)=> x+y)
+h1bKey: org.apache.spark.rdd.RDD[(Int, Int)] = ShuffledRDD[47] at reduceByKey at <console>:37
+
+scala> h1bKey.take(10).foreach(println)
+(2012,415607)
+(2016,647803)
+(2013,442114)
+(2014,519427)
+(2015,618727)
+(2011,358767)
+
+
+val result = h1bKey.map(x=> {
+     (x._1+"\0"+x._2)
+     })
+	 
+	 
+scala> result.saveAsTextFile("/user/rajeshs/itv_problems_practice/problem10/solution/",classOf[org.apache.hadoop.io.compress.SnappyCodec])
+
+verify the answer: 
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem10/solution/part-00000.snappy").take(3).foreach(println)
+20161
+20161
+20161
+
+
+val verify = result.map(x=> {
+      val a = x.split("\0")
+      (a(1)toInt,a(0))
+      })
+
+	  
+	  
+/***************************************************************************************************************************************************/
+/***************************************************************************************************************************************************/
+11)
+
+
+Instructions
+Get number of LCAs by status for the year 2016
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data
+Ignore first record which is header of the data
+YEAR is 8th field in the data
+STATUS is 2nd field in the data
+There are some LCAs for which YEAR is NA, ignore those records
+Output Requirements
+File Format: json
+Output Field Names: year, status, count
+Place the output files in the HDFS directory
+/user/`whoami`/problem11/solution/
+/user/rajeshs/itv_problems_practice/problem11/solution
+Replace `whoami` with your OS user name
+End of Problem
+
+Answer : 
+
+
+val h1b_data= sc.textFile("/public/h1b/h1b_data")
+
+scala> h1b_data.first
+res1: String = ?CASE_STATUS?EMPLOYER_NAME?SOC_NAME?JOB_TITLE?FULL_TIME_POSITION?PREVAILING_WAGE?YEAR?WORKSITE?lon?lat 
+
+scala> h1b_data.count
+res13: Long = 3002459
+
+scala> val h1bDF= h1b_data.filter(x=>x.split("\0")(7)=="2016").map(x=> {
+           val h = x.split("\0")
+           (h(1),h(7),1)
+           }).toDF("status","year","count")
+h1bDF: org.apache.spark.sql.DataFrame = [status: string, year: string, count: int]
+
+h1bDF.registerTempTable("h1bdata")
+
+val  LCAs_by_status_2016 = sqlContext.sql("select year,status,sum(count) from h1bdata where year ='2016' group by status,year ")
+
+scala> LCAs_by_status_2016.save("/user/rajeshs/itv_problems_practice/problem11/solution","json")
+warning: there were 1 deprecation warning(s); re-run with -deprecation for details
+
+verify the answer :
+
+  scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem11/solution").take(10).foreach(println)
+{"year":"2016","status":"WITHDRAWN","_c2":21890}
+{"year":"2016","status":"CERTIFIED-WITHDRAWN","_c2":47092}
+{"year":"2016","status":"CERTIFIED","_c2":569646}
+{"year":"2016","status":"DENIED","_c2":9175}
+
+
+/***************************************************************************************************************************************************/
+12)
+Instructions
+Get top 5 employers for year 2016 where the status is WITHDRAWN or CERTIFIED-WITHDRAWN or DENIED
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data
+Ignore first record which is header of the data
+YEAR is 7th field in the data
+STATUS is 2nd field in the data
+EMPLOYER is 3rd field in the data
+There are some LCAs for which YEAR is NA, ignore those records
+Output Requirements
+File Format: parquet
+Output Fields: employer_name, lca_count
+Data needs to be in descending order by count
+Place the output files in the HDFS directory
+/user/`whoami`/problem12/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+/user/rajeshs/itv_problems_practice/problem12/solution
+
+Answer :
+
+
+scala> val emp= sc.textFile("/public/h1b/h1b_data")
+emp: org.apache.spark.rdd.RDD[String] = /public/h1b/h1b_data MapPartitionsRDD[3] at textFile at <console>:27
+
+scala> emp.count
+res2: Long = 3002459
+
+scala> emp.take(5).foreach(println)
+
+
+CASE_STATUSEMPLOYER_NAMESOC_NAMEJOB_TITLEFULL_TIME_POSITIONPREVAILING_WAGEYEARWORKSITElonlat
+1CERTIFIED-WITHDRAWNUNIVERSITY OF MICHIGANBIOCHEMISTS AND BIOPHYSICISTSPOSTDOCTORAL RESEARCH FELLOWN360672016ANN ARBOR, MICHIGAN-83.743037842.2808256
+2CERTIFIED-WITHDRAWNGOODMAN NETWORKS, INC.CHIEF EXECUTIVESCHIEF OPERATING OFFICERY2426742016PLANO, TEXAS-96.698885633.0198431
+3CERTIFIED-WITHDRAWNPORTS AMERICA GROUP, INC.CHIEF EXECUTIVESCHIEF PROCESS OFFICERY1930662016JERSEY CITY, NEW JERSEY-74.077641740.7281575
+4CERTIFIED-WITHDRAWNGATES CORPORATION, A WHOLLY-OWNED SUBSIDIARY OF TOMKINS PLCCHIEF EXECUTIVESREGIONAL PRESIDEN, AMERICASY2203142016DENVER, COLORADO-104.99025139.7392358
+
+
+scala> val header = emp.first
+header: String = ?CASE_STATUS?EMPLOYER_NAME?SOC_NAME?JOB_TITLE?FULL_TIME_POSITION?PREVAILING_WAGE?YEAR?WORKSITE?lon?lat
+scala> val emp1= emp.filter(x=>x != header)
+emp1: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[4] at filter at <console>:31
+
+scala> emp1.count
+res4: Long = 3002458
+
+scala> val empDF =emp1.map(x=> {
+     |       val h= x.split("\0")
+     |       (h(7),h(1),h(2),1)
+     |       }).toDF("YEAR","STATUS","EMPLOYER","LCA_COUNT")
+empDF: org.apache.spark.sql.DataFrame = [YEAR: string, STATUS: string, EMPLOYER: string, LCA_COUNT: int]
+
+scala> empDF.show
++----+-------------------+--------------------+---------+
+|YEAR|             STATUS|            EMPLOYER|LCA_COUNT|
++----+-------------------+--------------------+---------+
+|2016|CERTIFIED-WITHDRAWN|UNIVERSITY OF MIC...|        1|
+|2016|CERTIFIED-WITHDRAWN|GOODMAN NETWORKS,...|        1|
+|2016|CERTIFIED-WITHDRAWN|PORTS AMERICA GRO...|        1|
+|2016|CERTIFIED-WITHDRAWN|GATES CORPORATION...|        1|
+|2016|          WITHDRAWN|PEABODY INVESTMEN...|        1|
+
+scala> empDF.registerTempTable("emp")
+
+scala> sqlContext.sql("select count(YEAR) from emp where YEAR='NA'").show
++---+
+|_c0|
++---+
+| 85|
++---+
+
+scala> empDF.where("YEAR!='NA'").where("YEAR ='2016'").count
+res36: Long = 647803
+
+
+
+scala> val result = sqlContext.sql("select EMPLOYER, sum(LCA_COUNT)as LCA_Count from emp where YEAR not in ('NA') and YEAR ='2016' and STATUS in ('WITHDRAWN','CERTIFIED-WITHDRAWN' ,'DENIED') group by LCA_COUNT,EMPLOYER order by sum(LCA_COUNT) desc limit 5")
+result: org.apache.spark.sql.DataFrame = [EMPLOYER: string, LCA_Count: bigint]
+
+scala> result.show
++--------------------+---------+
+|            EMPLOYER|LCA_Count|
++--------------------+---------+
+|IBM INDIA PRIVATE...|     1963|
+|         GOOGLE INC.|     1608|
+|COGNIZANT TECHNOL...|     1323|
+|       WIPRO LIMITED|     1079|
+|     IBM CORPORATION|      816|
++--------------------+---------+
+
+
+scala> result.coalesce(1).saveAsParquetFile("/user/rajeshs/itv_problems_practice/problem12/solution1_default")
+warning: there were 1 deprecation warning(s); re-run with -deprecation for details
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls -h  /user/rajeshs/itv_problems_practice/problem12/solution1_default
+Found 4 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-04 14:39 /user/rajeshs/itv_problems_practice/problem12/solution1_default/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs        305 2018-10-04 14:39 /user/rajeshs/itv_problems_practice/problem12/solution1_default/_common_metadata
+-rw-r--r--   2 rajeshs hdfs        590 2018-10-04 14:39 /user/rajeshs/itv_problems_practice/problem12/solution1_default/_metadata
+-rw-r--r--   2 rajeshs hdfs    181.4 K 2018-10-04 14:39 /user/rajeshs/itv_problems_practice/problem12/solution1_default/part-r-00000-2a8a086f-9430-426b-88c0-13a7f4f2d219.gz.parquet
+
+
+
+as we didnt do sc.setConf to uncompress , it took parquet default compression technique  i.e Gzip.
+
+
+we will try with uncompress once.
+
+
+sqlContext.setConf("spark.sql.parquet.compression.codec", "uncompressed")
+
+scala> result.saveAsParquetFile("/user/rajeshs/itv_problems_practice/problem12/solution1_uncompress")
+warning: there were 1 deprecation warning(s); re-run with -deprecation for details
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls -h  "/user/rajeshs/itv_problems_practice/problem12/solution1_uncompress"
+Found 4 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-04 14:58 /user/rajeshs/itv_problems_practice/problem12/solution1_uncompress/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs        305 2018-10-04 14:58 /user/rajeshs/itv_problems_practice/problem12/solution1_uncompress/_common_metadata
+-rw-r--r--   2 rajeshs hdfs        596 2018-10-04 14:58 /user/rajeshs/itv_problems_practice/problem12/solution1_uncompress/_metadata
+-rw-r--r--   2 rajeshs hdfs        789 2018-10-04 14:58 /user/rajeshs/itv_problems_practice/problem12/solution1_uncompress/part-r-00000-769ce0b5-3c26-4222-af5e-c621ae5cd8e3.parquet
+
+
+verify the answer : 
+
+
+
+scala> sqlContext.read.parquet("/user/rajeshs/itv_problems_practice/problem12/solution1_uncompress/part-r-00000-769ce0b5-3c26-4222-af5e-c621ae5cd8e3.parquet").show
++--------------------+---------+
+|            EMPLOYER|LCA_Count|
++--------------------+---------+
+|IBM INDIA PRIVATE...|     1963|
+|         GOOGLE INC.|     1608|
+|COGNIZANT TECHNOL...|     1323|
+|       WIPRO LIMITED|     1079|
+|     IBM CORPORATION|      816|
++--------------------+---------+
+
+
+/*************************************************************************************************************/
+
+13)
+
+Instructions
+Copy all h1b data from HDFS to Hive table excluding those where year is NA or prevailing_wage is NA
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data_noheader
+Fields: 
+ID, CASE_STATUS, EMPLOYER_NAME, SOC_NAME, JOB_TITLE, FULL_TIME_POSITION, PREVAILING_WAGE, YEAR, WORKSITE, LONGITUDE, LATITUDE
+Ignore data where PREVAILING_WAGE is NA or YEAR is NA
+PREVAILING_WAGE is 7th field
+YEAR is 8th field
+Number of records matching criteria: 3002373
+Output Requirements
+Save it in Hive Database
+Create Database: CREATE DATABASE IF NOT EXISTS `whoami`
+Switch Database: USE `whoami`
+Save data to hive table h1b_data
+Create table command:
+
+CREATE TABLE h1b_data1 (
+  ID                 INT,
+  CASE_STATUS        STRING,
+  EMPLOYER_NAME      STRING,
+  SOC_NAME           STRING,
+  JOB_TITLE          STRING,
+  FULL_TIME_POSITION STRING,
+  PREVAILING_WAGE    DOUBLE,
+  YEAR               INT,
+  WORKSITE           STRING,
+  LONGITUDE          STRING,
+  LATITUDE           STRING
+) ROW FORMAT DELIMITED FIELDS TERMINATED BY "\0"
+                
+Replace `whoami` with your OS user name
+End of Problem
+
+
+Answer :
+
+
+
+val h1b_data_noheader = sc.textFile("/public/h1b/h1b_data_noheader")
+
+h1b_data_noheader: org.apache.spark.rdd.RDD[String] = /public/h1b/h1b_data_noheader MapPartitionsRDD[1] at textFile at <console>:27
+
+scala> h1b_data_noheader.count
+res1: Long = 3002458
+
+scala> h1b_data_noheader.first
+res2: String = 1?CERTIFIED-WITHDRAWN?UNIVERSITY OF MICHIGAN?BIOCHEMISTS AND BIOPHYSICISTS?POSTDOCTORAL RESEARCH FELLOW?N?36067?2016?ANN ARBOR, MICHIGAN?-83.7430378?42.2808256
+
+
+val datayear = data.
+filter(rec => rec.split("\0")(7) != "NA").
+filter(rec=>rec.split("\0")(6)!= "NA").saveAsTextFile("/user/rajeshs/itv_problems_practice/problem13/inputdataforHive")
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem13/inputdataforHive").count
+res34: Long = 3002373
+
+
+
+hive (default)> CREATE DATABASE IF NOT EXISTS rajesh_itv_problem13DB;
+hive (default)> use rajesh_itv_problem13DB;
+OK
+Time taken: 1.918 seconds
+hive (rajesh_itv_problem13DB)>
+
+CREATE TABLE h1b_data (
+   ID                 INT,
+   CASE_STATUS        STRING,
+   EMPLOYER_NAME      STRING,
+   SOC_NAME           STRING,
+   JOB_TITLE          STRING,
+   FULL_TIME_POSITION STRING,
+   PREVAILING_WAGE    DOUBLE,
+   YEAR               INT,
+   WORKSITE           STRING,
+   LONGITUDE          STRING,
+   LATITUDE           STRING
+ ) ROW FORMAT DELIMITED FIELDS TERMINATED BY "\0";
+							 
+
+
+hive (rajesh_itv_problem13DB)> load data inpath '/user/rajeshs/itv_problems_practice/problem13/inputdataforHive' into table h1b_data;
+Loading data to table rajesh_itv_problem13db.h1b_data
+Table rajesh_itv_problem13db.h1b_data stats: [numFiles=4, numRows=0, totalSize=450248368, rawDataSize=0]
+OK
+Time taken: 0.84 seconds
+
+hive (rajesh_itv_problem13DB)> select * from h1b_data limit 2;
+OK
+1       CERTIFIED-WITHDRAWN     UNIVERSITY OF MICHIGAN  BIOCHEMISTS AND BIOPHYSICISTS   POSTDOCTORAL RESEARCH FELLOW    N       36067.0 2016     ANN ARBOR, MICHIGAN     -83.7430378     42.2808256
+2       CERTIFIED-WITHDRAWN     GOODMAN NETWORKS, INC.  CHIEF EXECUTIVES        CHIEF OPERATING OFFICER Y       242674.0        2016    PLANO, TEXAS     -96.6988856     33.0198431
+Time taken: 0.225 seconds, Fetched: 2 row(s)
+hive (rajesh_itv_problem13DB)>
+
+
+
+DF way :
+
+
+
+/*************************************************************************************************************************************/
+/*************************************************************************************************************************************/
+<<<<<<< HEAD
+
+14)
+
+Instructions
+Export h1b data from hdfs to MySQL Database
+
+Data Description
+h1b data with ascii character "\001" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data_to_be_exported
+Fields: 
+ID, CASE_STATUS, EMPLOYER_NAME, SOC_NAME, JOB_TITLE, FULL_TIME_POSITION, PREVAILING_WAGE, YEAR, WORKSITE, LONGITUDE, LATITUDE
+Number of records: 3002373
+Output Requirements
+Export data to MySQL Database
+MySQL database is running on ms.itversity.com
+User: h1b_user
+Password: itversity
+Database Name: h1b_export
+Table Name: h1b_data_`whoami`
+Nulls are represented as: NA
+After export nulls should not be stored as NA in database. It should be represented as database null
+Create table command:
+
+CREATE TABLE h1b_data_`whoami` (
+  ID                 INT, 
+  CASE_STATUS        VARCHAR(50), 
+  EMPLOYER_NAME      VARCHAR(100), 
+  SOC_NAME           VARCHAR(100), 
+  JOB_TITLE          VARCHAR(100), 
+  FULL_TIME_POSITION VARCHAR(50), 
+  PREVAILING_WAGE    FLOAT, 
+  YEAR               INT, 
+  WORKSITE           VARCHAR(50), 
+  LONGITUDE          VARCHAR(50), 
+  LATITUDE           VARCHAR(50));
+                
+Replace `whoami` with your OS user name
+Above create table command can be run using
+Login using mysql -u h1b_user -h ms.itversity.com -p
+When prompted enter password itversity
+Switch to database using use h1b_export
+Run above create table command by replacing `whoami` with your OS user name
+End of Problem
+
+
+Answer :
+
+[rajeshs@gw02 ~]$ mysql -u h1b_user -h ms.itversity.com -p
+
+mysql> use h1b_export;
+
+
+CREATE TABLE h1b_data_rajeshs (
+  ID                 INT, 
+  CASE_STATUS        VARCHAR(50), 
+  EMPLOYER_NAME      VARCHAR(100), 
+  SOC_NAME           VARCHAR(100), 
+  JOB_TITLE          VARCHAR(100), 
+  FULL_TIME_POSITION VARCHAR(50), 
+  PREVAILING_WAGE    FLOAT, 
+  YEAR               INT, 
+  WORKSITE           VARCHAR(50), 
+  LONGITUDE          VARCHAR(50), 
+  LATITUDE           VARCHAR(50));
+
+  Query OK, 0 rows affected (0.12 sec)
+
+mysql>
+mysql> select * from h1b_data_rajeshs limit 10;
+Empty set (0.00 sec)
+
+//mysql connection check 
+
+sqoop eval \
+--connect jdbc:mysql://ms.itversity.com/h1b_export \
+--username h1b_user \
+--password itversity \
+--query "show tables"
+
+// data count check 
+
+scala> val dataforExport = sc.textFile("/public/h1b/h1b_data_to_be_exported")
+dataforExport: org.apache.spark.rdd.RDD[String] = /public/h1b/h1b_data_to_be_exported MapPartitionsRDD[140] at textFile at <console>:27
+
+scala> dataforExport.count
+res52: Long = 3002373
+
+//  scenario 2 : with default mappers 
+
+
+sqoop export \
+--connect jdbc:mysql://ms.itversity.com/h1b_export \
+--username h1b_user \
+--password itversity \
+--table h1b_data_rajeshs \
+--export-dir "/public/h1b/h1b_data_to_be_exported" \
+--input-null-string  "NA" \
+--fields-terminated-by "\001"
+
+
+[rajeshs@gw02 ~]$ sqoop export \
+> --connect jdbc:mysql://ms.itversity.com/h1b_export \
+> --username h1b_user \
+> --password itversity \
+> --table h1b_data_rajeshs \
+> --export-dir "/public/h1b/h1b_data_to_be_exported" \
+> --input-null-string  "NA" \
+> --fields-terminated-by "\001"
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/06 14:36:03 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/06 14:36:03 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/06 14:36:03 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/06 14:36:03 INFO tool.CodeGenTool: Beginning code generation
+18/10/06 14:36:04 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data_rajeshs` AS t LIMIT 1
+18/10/06 14:36:04 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data_rajeshs` AS t LIMIT 1
+18/10/06 14:36:04 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/6acf589e0c946c2dceeffb97987334c5/h1b_data_rajeshs.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/06 14:36:06 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/6acf589e0c946c2dceeffb97987334c5/h1b_data_rajeshs.jar
+18/10/06 14:36:06 INFO mapreduce.ExportJobBase: Beginning export of h1b_data_rajeshs
+18/10/06 14:36:07 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/06 14:36:07 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/06 14:36:14 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:36:14 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:36:14 INFO mapreduce.JobSubmitter: number of splits:4
+18/10/06 14:36:15 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3660
+18/10/06 14:36:15 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3660
+18/10/06 14:36:15 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3660/
+18/10/06 14:36:15 INFO mapreduce.Job: Running job: job_1538287994192_3660
+18/10/06 14:36:24 INFO mapreduce.Job: Job job_1538287994192_3660 running in uber mode : false
+18/10/06 14:36:24 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/06 14:36:36 INFO mapreduce.Job:  map 4% reduce 0%
+18/10/06 14:36:37 INFO mapreduce.Job:  map 5% reduce 0%
+18/10/06 14:36:39 INFO mapreduce.Job:  map 8% reduce 0%
+18/10/06 14:36:40 INFO mapreduce.Job:  map 9% reduce 0%
+18/10/06 14:36:42 INFO mapreduce.Job:  map 12% reduce 0%
+18/10/06 14:36:43 INFO mapreduce.Job:  map 13% reduce 0%
+18/10/06 14:36:45 INFO mapreduce.Job:  map 16% reduce 0%
+18/10/06 14:36:46 INFO mapreduce.Job:  map 17% reduce 0%
+18/10/06 14:36:48 INFO mapreduce.Job:  map 19% reduce 0%
+18/10/06 14:36:49 INFO mapreduce.Job:  map 20% reduce 0%
+18/10/06 14:36:51 INFO mapreduce.Job:  map 23% reduce 0%
+18/10/06 14:36:52 INFO mapreduce.Job:  map 24% reduce 0%
+18/10/06 14:36:54 INFO mapreduce.Job:  map 27% reduce 0%
+18/10/06 14:36:55 INFO mapreduce.Job:  map 28% reduce 0%
+18/10/06 14:36:57 INFO mapreduce.Job:  map 31% reduce 0%
+18/10/06 14:36:58 INFO mapreduce.Job:  map 32% reduce 0%
+18/10/06 14:37:00 INFO mapreduce.Job:  map 35% reduce 0%
+18/10/06 14:37:03 INFO mapreduce.Job:  map 38% reduce 0%
+18/10/06 14:37:06 INFO mapreduce.Job:  map 41% reduce 0%
+18/10/06 14:37:07 INFO mapreduce.Job:  map 42% reduce 0%
+18/10/06 14:37:09 INFO mapreduce.Job:  map 45% reduce 0%
+18/10/06 14:37:10 INFO mapreduce.Job:  map 46% reduce 0%
+18/10/06 14:37:12 INFO mapreduce.Job:  map 49% reduce 0%
+18/10/06 14:37:13 INFO mapreduce.Job:  map 50% reduce 0%
+18/10/06 14:37:15 INFO mapreduce.Job:  map 53% reduce 0%
+18/10/06 14:37:16 INFO mapreduce.Job:  map 54% reduce 0%
+18/10/06 14:37:18 INFO mapreduce.Job:  map 56% reduce 0%
+18/10/06 14:37:19 INFO mapreduce.Job:  map 57% reduce 0%
+18/10/06 14:37:21 INFO mapreduce.Job:  map 60% reduce 0%
+18/10/06 14:37:24 INFO mapreduce.Job:  map 63% reduce 0%
+18/10/06 14:37:25 INFO mapreduce.Job:  map 64% reduce 0%
+18/10/06 14:37:27 INFO mapreduce.Job:  map 67% reduce 0%
+18/10/06 14:37:28 INFO mapreduce.Job:  map 68% reduce 0%
+18/10/06 14:37:30 INFO mapreduce.Job:  map 71% reduce 0%
+18/10/06 14:37:31 INFO mapreduce.Job:  map 72% reduce 0%
+18/10/06 14:37:33 INFO mapreduce.Job:  map 74% reduce 0%
+18/10/06 14:37:34 INFO mapreduce.Job:  map 75% reduce 0%
+18/10/06 14:37:36 INFO mapreduce.Job:  map 77% reduce 0%
+18/10/06 14:37:39 INFO mapreduce.Job:  map 79% reduce 0%
+18/10/06 14:37:40 INFO mapreduce.Job:  map 80% reduce 0%
+18/10/06 14:37:42 INFO mapreduce.Job:  map 82% reduce 0%
+18/10/06 14:37:43 INFO mapreduce.Job:  map 83% reduce 0%
+18/10/06 14:37:45 INFO mapreduce.Job:  map 85% reduce 0%
+18/10/06 14:37:46 INFO mapreduce.Job:  map 86% reduce 0%
+18/10/06 14:37:48 INFO mapreduce.Job:  map 88% reduce 0%
+18/10/06 14:37:49 INFO mapreduce.Job:  map 89% reduce 0%
+18/10/06 14:37:51 INFO mapreduce.Job:  map 91% reduce 0%
+18/10/06 14:37:52 INFO mapreduce.Job:  map 92% reduce 0%
+18/10/06 14:37:54 INFO mapreduce.Job:  map 94% reduce 0%
+18/10/06 14:37:55 INFO mapreduce.Job:  map 95% reduce 0%
+18/10/06 14:37:57 INFO mapreduce.Job:  map 96% reduce 0%
+18/10/06 14:37:58 INFO mapreduce.Job:  map 97% reduce 0%
+18/10/06 14:38:00 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/06 14:38:01 INFO mapreduce.Job: Job job_1538287994192_3660 completed successfully
+18/10/06 14:38:01 INFO mapreduce.Job: Counters: 32
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=675228
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=456249071
+                HDFS: Number of bytes written=0
+                HDFS: Number of read operations=25
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=0
+        Job Counters
+                Launched map tasks=4
+                Other local map tasks=1
+                Data-local map tasks=2
+                Rack-local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=698080
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=349040
+                Total vcore-milliseconds taken by all map tasks=349040
+                Total megabyte-milliseconds taken by all map tasks=714833920
+        Map-Reduce Framework
+                Map input records=3002373
+                Map output records=3002373
+                Input split bytes=907
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=478
+                CPU time spent (ms)=57480
+                Physical memory (bytes) snapshot=1162027008
+                Virtual memory (bytes) snapshot=14911651840
+                Total committed heap usage (bytes)=732954624
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=0
+18/10/06 14:38:01 INFO mapreduce.ExportJobBase: Transferred 435.113 MB in 114.17 seconds (3.8111 MB/sec)
+18/10/06 14:38:01 INFO mapreduce.ExportJobBase: Exported 3002373 records.
+[rajeshs@gw02 ~]$ 
+
+
+scenario 2 : with 12 mappers => 
+
+CREATE TABLE h1b_data1_rajeshs (
+  ID                 INT, 
+  CASE_STATUS        VARCHAR(50), 
+  EMPLOYER_NAME      VARCHAR(100), 
+  SOC_NAME           VARCHAR(100), 
+  JOB_TITLE          VARCHAR(100), 
+  FULL_TIME_POSITION VARCHAR(50), 
+  PREVAILING_WAGE    FLOAT, 
+  YEAR               INT, 
+  WORKSITE           VARCHAR(50), 
+  LONGITUDE          VARCHAR(50), 
+  LATITUDE           VARCHAR(50));
+Query OK, 0 rows affected (0.26 sec)
+
+mysql>
+
+
+
+sqoop export \
+--connect jdbc:mysql://ms.itversity.com/h1b_export \
+--username h1b_user \
+--password itversity \
+--table h1b_data1_rajeshs \
+--export-dir "/public/h1b/h1b_data_to_be_exported" \
+--input-null-string  "NA" \
+--fields-terminated-by "\001" \
+-m 12
+
+[rajeshs@gw02 ~]$ sqoop export \
+> --connect jdbc:mysql://ms.itversity.com/h1b_export \
+> --username h1b_user \
+> --password itversity \
+> --table h1b_data1_rajeshs \
+> --export-dir "/public/h1b/h1b_data_to_be_exported" \
+> --input-null-string  "NA" \
+> --fields-terminated-by "\001" \
+> -m 12
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/06 14:43:01 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/06 14:43:01 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/06 14:43:01 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/06 14:43:01 INFO tool.CodeGenTool: Beginning code generation
+18/10/06 14:43:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data1_rajeshs` AS t LIMIT 1
+18/10/06 14:43:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data1_rajeshs` AS t LIMIT 1
+18/10/06 14:43:02 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/1364957e95218ea03e5a5525dc3c3565/h1b_data1_rajeshs.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/06 14:43:03 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/1364957e95218ea03e5a5525dc3c3565/h1b_data1_rajeshs.jar
+18/10/06 14:43:03 INFO mapreduce.ExportJobBase: Beginning export of h1b_data1_rajeshs
+18/10/06 14:43:05 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/06 14:43:05 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/06 14:43:12 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:43:12 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:43:12 INFO mapreduce.JobSubmitter: number of splits:11
+18/10/06 14:43:13 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3663
+18/10/06 14:43:13 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3663
+18/10/06 14:43:13 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3663/
+18/10/06 14:43:13 INFO mapreduce.Job: Running job: job_1538287994192_3663
+18/10/06 14:43:22 INFO mapreduce.Job: Job job_1538287994192_3663 running in uber mode : false
+18/10/06 14:43:22 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/06 14:43:35 INFO mapreduce.Job:  map 4% reduce 0%
+18/10/06 14:43:38 INFO mapreduce.Job:  map 7% reduce 0%
+18/10/06 14:43:39 INFO mapreduce.Job:  map 8% reduce 0%
+18/10/06 14:43:40 INFO mapreduce.Job:  map 9% reduce 0%
+18/10/06 14:43:41 INFO mapreduce.Job:  map 10% reduce 0%
+18/10/06 14:43:42 INFO mapreduce.Job:  map 11% reduce 0%
+18/10/06 14:43:43 INFO mapreduce.Job:  map 13% reduce 0%
+18/10/06 14:43:44 INFO mapreduce.Job:  map 14% reduce 0%
+18/10/06 14:43:46 INFO mapreduce.Job:  map 15% reduce 0%
+18/10/06 14:43:47 INFO mapreduce.Job:  map 16% reduce 0%
+18/10/06 14:43:48 INFO mapreduce.Job:  map 17% reduce 0%
+18/10/06 14:43:49 INFO mapreduce.Job:  map 18% reduce 0%
+18/10/06 14:43:50 INFO mapreduce.Job:  map 19% reduce 0%
+18/10/06 14:43:51 INFO mapreduce.Job:  map 20% reduce 0%
+18/10/06 14:43:52 INFO mapreduce.Job:  map 21% reduce 0%
+18/10/06 14:43:53 INFO mapreduce.Job:  map 22% reduce 0%
+18/10/06 14:43:54 INFO mapreduce.Job:  map 23% reduce 0%
+18/10/06 14:43:55 INFO mapreduce.Job:  map 25% reduce 0%
+18/10/06 14:43:56 INFO mapreduce.Job:  map 26% reduce 0%
+18/10/06 14:43:57 INFO mapreduce.Job:  map 27% reduce 0%
+18/10/06 14:43:58 INFO mapreduce.Job:  map 28% reduce 0%
+18/10/06 14:43:59 INFO mapreduce.Job:  map 29% reduce 0%
+18/10/06 14:44:00 INFO mapreduce.Job:  map 30% reduce 0%
+18/10/06 14:44:01 INFO mapreduce.Job:  map 31% reduce 0%
+18/10/06 14:44:02 INFO mapreduce.Job:  map 32% reduce 0%
+18/10/06 14:44:03 INFO mapreduce.Job:  map 33% reduce 0%
+18/10/06 14:44:04 INFO mapreduce.Job:  map 34% reduce 0%
+18/10/06 14:44:05 INFO mapreduce.Job:  map 35% reduce 0%
+18/10/06 14:44:06 INFO mapreduce.Job:  map 36% reduce 0%
+18/10/06 14:44:07 INFO mapreduce.Job:  map 37% reduce 0%
+18/10/06 14:44:08 INFO mapreduce.Job:  map 38% reduce 0%
+18/10/06 14:44:10 INFO mapreduce.Job:  map 40% reduce 0%
+18/10/06 14:44:11 INFO mapreduce.Job:  map 41% reduce 0%
+18/10/06 14:44:13 INFO mapreduce.Job:  map 42% reduce 0%
+18/10/06 14:44:14 INFO mapreduce.Job:  map 43% reduce 0%
+18/10/06 14:44:15 INFO mapreduce.Job:  map 44% reduce 0%
+18/10/06 14:44:16 INFO mapreduce.Job:  map 45% reduce 0%
+18/10/06 14:44:17 INFO mapreduce.Job:  map 46% reduce 0%
+18/10/06 14:44:18 INFO mapreduce.Job:  map 47% reduce 0%
+18/10/06 14:44:19 INFO mapreduce.Job:  map 49% reduce 0%
+18/10/06 14:44:21 INFO mapreduce.Job:  map 50% reduce 0%
+18/10/06 14:44:22 INFO mapreduce.Job:  map 52% reduce 0%
+18/10/06 14:44:23 INFO mapreduce.Job:  map 53% reduce 0%
+18/10/06 14:44:25 INFO mapreduce.Job:  map 55% reduce 0%
+18/10/06 14:44:27 INFO mapreduce.Job:  map 56% reduce 0%
+18/10/06 14:44:28 INFO mapreduce.Job:  map 57% reduce 0%
+18/10/06 14:44:29 INFO mapreduce.Job:  map 58% reduce 0%
+18/10/06 14:44:30 INFO mapreduce.Job:  map 59% reduce 0%
+18/10/06 14:44:31 INFO mapreduce.Job:  map 60% reduce 0%
+18/10/06 14:44:32 INFO mapreduce.Job:  map 61% reduce 0%
+18/10/06 14:44:34 INFO mapreduce.Job:  map 63% reduce 0%
+18/10/06 14:44:35 INFO mapreduce.Job:  map 64% reduce 0%
+18/10/06 14:44:37 INFO mapreduce.Job:  map 65% reduce 0%
+18/10/06 14:44:38 INFO mapreduce.Job:  map 66% reduce 0%
+18/10/06 14:44:39 INFO mapreduce.Job:  map 67% reduce 0%
+18/10/06 14:44:40 INFO mapreduce.Job:  map 68% reduce 0%
+18/10/06 14:44:41 INFO mapreduce.Job:  map 69% reduce 0%
+18/10/06 14:44:43 INFO mapreduce.Job:  map 71% reduce 0%
+18/10/06 14:44:44 INFO mapreduce.Job:  map 72% reduce 0%
+18/10/06 14:44:46 INFO mapreduce.Job:  map 74% reduce 0%
+18/10/06 14:44:48 INFO mapreduce.Job:  map 75% reduce 0%
+18/10/06 14:44:49 INFO mapreduce.Job:  map 77% reduce 0%
+18/10/06 14:44:51 INFO mapreduce.Job:  map 78% reduce 0%
+18/10/06 14:44:52 INFO mapreduce.Job:  map 80% reduce 0%
+18/10/06 14:44:54 INFO mapreduce.Job:  map 81% reduce 0%
+18/10/06 14:44:55 INFO mapreduce.Job:  map 83% reduce 0%
+18/10/06 14:44:57 INFO mapreduce.Job:  map 84% reduce 0%
+18/10/06 14:44:58 INFO mapreduce.Job:  map 85% reduce 0%
+18/10/06 14:44:59 INFO mapreduce.Job:  map 86% reduce 0%
+18/10/06 14:45:01 INFO mapreduce.Job:  map 89% reduce 0%
+18/10/06 14:45:03 INFO mapreduce.Job:  map 90% reduce 0%
+18/10/06 14:45:04 INFO mapreduce.Job:  map 93% reduce 0%
+18/10/06 14:45:07 INFO mapreduce.Job:  map 95% reduce 0%
+18/10/06 14:45:10 INFO mapreduce.Job:  map 97% reduce 0%
+18/10/06 14:45:12 INFO mapreduce.Job:  map 98% reduce 0%
+18/10/06 14:45:13 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/06 14:45:14 INFO mapreduce.Job: Job job_1538287994192_3663 completed successfully
+18/10/06 14:45:14 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=1856933
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=457302464
+                HDFS: Number of bytes written=0
+                HDFS: Number of read operations=56
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=0
+        Job Counters
+                Launched map tasks=11
+                Data-local map tasks=11
+                Total time spent by all maps in occupied slots (ms)=2199910
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=1099955
+                Total vcore-milliseconds taken by all map tasks=1099955
+                Total megabyte-milliseconds taken by all map tasks=2252707840
+        Map-Reduce Framework
+                Map input records=3002373
+                Map output records=3002373
+                Input split bytes=2099
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=2649
+                CPU time spent (ms)=110410
+                Physical memory (bytes) snapshot=3764436992
+                Virtual memory (bytes) snapshot=40948187136
+                Total committed heap usage (bytes)=2727346176
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=0
+18/10/06 14:45:14 INFO mapreduce.ExportJobBase: Transferred 436.1176 MB in 129.6704 seconds (3.3633 MB/sec)
+18/10/06 14:45:14 INFO mapreduce.ExportJobBase: Exported 3002373 records.
+
+
+
+
+scenario 2 : with 24 mappers => 
+
+CREATE TABLE h1b_data2_rajeshs (
+  ID                 INT, 
+  CASE_STATUS        VARCHAR(50), 
+  EMPLOYER_NAME      VARCHAR(100), 
+  SOC_NAME           VARCHAR(100), 
+  JOB_TITLE          VARCHAR(100), 
+  FULL_TIME_POSITION VARCHAR(50), 
+  PREVAILING_WAGE    FLOAT, 
+  YEAR               INT, 
+  WORKSITE           VARCHAR(50), 
+  LONGITUDE          VARCHAR(50), 
+  LATITUDE           VARCHAR(50));
+Query OK, 0 rows affected (0.26 sec)
+
+mysql>
+
+
+
+sqoop export \
+--connect jdbc:mysql://ms.itversity.com/h1b_export \
+--username h1b_user \
+--password itversity \
+--table h1b_data1_rajeshs \
+--export-dir "/public/h1b/h1b_data_to_be_exported" \
+--input-null-string  "NA" \
+--input-null-non-string "NA" \
+--fields-terminated-by "\001" \
+-m 24
+[rajeshs@gw02 ~]$ sqoop export \
+> --connect jdbc:mysql://ms.itversity.com/h1b_export \
+> --username h1b_user \
+> --password itversity \
+> --table h1b_data1_rajeshs \
+> --export-dir "/public/h1b/h1b_data_to_be_exported" \
+> --input-null-string  "NA" \
+> --input-null-non-string "NA" \
+> --fields-terminated-by "\001" \
+> -m 24
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/06 14:51:37 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/06 14:51:37 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/06 14:51:37 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/06 14:51:37 INFO tool.CodeGenTool: Beginning code generation
+18/10/06 14:51:38 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data1_rajeshs` AS t LIMIT 1
+18/10/06 14:51:38 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data1_rajeshs` AS t LIMIT 1
+18/10/06 14:51:38 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/73413a4e6d880c87b8a647bf0d63e25e/h1b_data1_rajeshs.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/06 14:51:40 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/73413a4e6d880c87b8a647bf0d63e25e/h1b_data1_rajeshs.jar
+18/10/06 14:51:40 INFO mapreduce.ExportJobBase: Beginning export of h1b_data1_rajeshs
+18/10/06 14:51:42 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/06 14:51:42 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/06 14:51:49 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:51:49 INFO input.FileInputFormat: Total input paths to process : 4
+18/10/06 14:51:49 INFO mapreduce.JobSubmitter: number of splits:22
+18/10/06 14:51:49 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3671
+18/10/06 14:51:50 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3671
+18/10/06 14:51:50 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3671/
+18/10/06 14:51:50 INFO mapreduce.Job: Running job: job_1538287994192_3671
+18/10/06 14:51:58 INFO mapreduce.Job: Job job_1538287994192_3671 running in uber mode : false
+18/10/06 14:51:58 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/06 14:52:10 INFO mapreduce.Job:  map 3% reduce 0%
+18/10/06 14:52:11 INFO mapreduce.Job:  map 5% reduce 0%
+18/10/06 14:52:12 INFO mapreduce.Job:  map 6% reduce 0%
+18/10/06 14:52:13 INFO mapreduce.Job:  map 7% reduce 0%
+18/10/06 14:52:14 INFO mapreduce.Job:  map 8% reduce 0%
+18/10/06 14:52:15 INFO mapreduce.Job:  map 9% reduce 0%
+18/10/06 14:52:16 INFO mapreduce.Job:  map 10% reduce 0%
+18/10/06 14:52:17 INFO mapreduce.Job:  map 12% reduce 0%
+18/10/06 14:52:19 INFO mapreduce.Job:  map 13% reduce 0%
+18/10/06 14:52:20 INFO mapreduce.Job:  map 14% reduce 0%
+18/10/06 14:52:21 INFO mapreduce.Job:  map 15% reduce 0%
+18/10/06 14:52:22 INFO mapreduce.Job:  map 16% reduce 0%
+18/10/06 14:52:23 INFO mapreduce.Job:  map 17% reduce 0%
+18/10/06 14:52:25 INFO mapreduce.Job:  map 18% reduce 0%
+18/10/06 14:52:26 INFO mapreduce.Job:  map 19% reduce 0%
+18/10/06 14:52:27 INFO mapreduce.Job:  map 20% reduce 0%
+18/10/06 14:52:28 INFO mapreduce.Job:  map 21% reduce 0%
+18/10/06 14:52:29 INFO mapreduce.Job:  map 22% reduce 0%
+18/10/06 14:52:31 INFO mapreduce.Job:  map 23% reduce 0%
+18/10/06 14:52:32 INFO mapreduce.Job:  map 24% reduce 0%
+18/10/06 14:52:33 INFO mapreduce.Job:  map 25% reduce 0%
+18/10/06 14:52:34 INFO mapreduce.Job:  map 26% reduce 0%
+18/10/06 14:52:35 INFO mapreduce.Job:  map 27% reduce 0%
+18/10/06 14:52:37 INFO mapreduce.Job:  map 28% reduce 0%
+18/10/06 14:52:38 INFO mapreduce.Job:  map 30% reduce 0%
+18/10/06 14:52:40 INFO mapreduce.Job:  map 31% reduce 0%
+18/10/06 14:52:41 INFO mapreduce.Job:  map 32% reduce 0%
+18/10/06 14:52:43 INFO mapreduce.Job:  map 33% reduce 0%
+18/10/06 14:52:44 INFO mapreduce.Job:  map 34% reduce 0%
+18/10/06 14:52:46 INFO mapreduce.Job:  map 35% reduce 0%
+18/10/06 14:52:47 INFO mapreduce.Job:  map 36% reduce 0%
+18/10/06 14:52:48 INFO mapreduce.Job:  map 37% reduce 0%
+18/10/06 14:52:50 INFO mapreduce.Job:  map 39% reduce 0%
+18/10/06 14:52:52 INFO mapreduce.Job:  map 40% reduce 0%
+18/10/06 14:52:53 INFO mapreduce.Job:  map 41% reduce 0%
+18/10/06 14:52:55 INFO mapreduce.Job:  map 42% reduce 0%
+18/10/06 14:52:56 INFO mapreduce.Job:  map 43% reduce 0%
+18/10/06 14:52:57 INFO mapreduce.Job:  map 44% reduce 0%
+18/10/06 14:52:59 INFO mapreduce.Job:  map 46% reduce 0%
+18/10/06 14:53:01 INFO mapreduce.Job:  map 47% reduce 0%
+18/10/06 14:53:02 INFO mapreduce.Job:  map 48% reduce 0%
+18/10/06 14:53:03 INFO mapreduce.Job:  map 49% reduce 0%
+18/10/06 14:53:05 INFO mapreduce.Job:  map 51% reduce 0%
+18/10/06 14:53:07 INFO mapreduce.Job:  map 52% reduce 0%
+18/10/06 14:53:08 INFO mapreduce.Job:  map 53% reduce 0%
+18/10/06 14:53:09 INFO mapreduce.Job:  map 54% reduce 0%
+18/10/06 14:53:11 INFO mapreduce.Job:  map 55% reduce 0%
+18/10/06 14:53:12 INFO mapreduce.Job:  map 56% reduce 0%
+18/10/06 14:53:14 INFO mapreduce.Job:  map 57% reduce 0%
+18/10/06 14:53:15 INFO mapreduce.Job:  map 58% reduce 0%
+18/10/06 14:53:16 INFO mapreduce.Job:  map 59% reduce 0%
+18/10/06 14:53:17 INFO mapreduce.Job:  map 60% reduce 0%
+18/10/06 14:53:18 INFO mapreduce.Job:  map 61% reduce 0%
+18/10/06 14:53:20 INFO mapreduce.Job:  map 62% reduce 0%
+18/10/06 14:53:21 INFO mapreduce.Job:  map 63% reduce 0%
+18/10/06 14:53:22 INFO mapreduce.Job:  map 64% reduce 0%
+18/10/06 14:53:23 INFO mapreduce.Job:  map 65% reduce 0%
+18/10/06 14:53:24 INFO mapreduce.Job:  map 66% reduce 0%
+18/10/06 14:53:26 INFO mapreduce.Job:  map 67% reduce 0%
+18/10/06 14:53:27 INFO mapreduce.Job:  map 68% reduce 0%
+18/10/06 14:53:28 INFO mapreduce.Job:  map 69% reduce 0%
+18/10/06 14:53:29 INFO mapreduce.Job:  map 70% reduce 0%
+18/10/06 14:53:31 INFO mapreduce.Job:  map 71% reduce 0%
+18/10/06 14:53:32 INFO mapreduce.Job:  map 72% reduce 0%
+18/10/06 14:53:34 INFO mapreduce.Job:  map 73% reduce 0%
+18/10/06 14:53:35 INFO mapreduce.Job:  map 74% reduce 0%
+18/10/06 14:53:36 INFO mapreduce.Job:  map 75% reduce 0%
+18/10/06 14:53:38 INFO mapreduce.Job:  map 77% reduce 0%
+18/10/06 14:53:40 INFO mapreduce.Job:  map 78% reduce 0%
+18/10/06 14:53:41 INFO mapreduce.Job:  map 79% reduce 0%
+18/10/06 14:53:42 INFO mapreduce.Job:  map 80% reduce 0%
+18/10/06 14:53:44 INFO mapreduce.Job:  map 81% reduce 0%
+18/10/06 14:53:45 INFO mapreduce.Job:  map 82% reduce 0%
+18/10/06 14:53:46 INFO mapreduce.Job:  map 83% reduce 0%
+18/10/06 14:53:47 INFO mapreduce.Job:  map 84% reduce 0%
+18/10/06 14:53:49 INFO mapreduce.Job:  map 85% reduce 0%
+18/10/06 14:53:50 INFO mapreduce.Job:  map 87% reduce 0%
+18/10/06 14:53:52 INFO mapreduce.Job:  map 88% reduce 0%
+18/10/06 14:53:53 INFO mapreduce.Job:  map 90% reduce 0%
+18/10/06 14:53:55 INFO mapreduce.Job:  map 91% reduce 0%
+18/10/06 14:53:56 INFO mapreduce.Job:  map 93% reduce 0%
+18/10/06 14:53:58 INFO mapreduce.Job:  map 94% reduce 0%
+18/10/06 14:53:59 INFO mapreduce.Job:  map 96% reduce 0%
+18/10/06 14:54:01 INFO mapreduce.Job:  map 98% reduce 0%
+18/10/06 14:54:02 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/06 14:54:03 INFO mapreduce.Job: Job job_1538287994192_3671 completed successfully
+18/10/06 14:54:04 INFO mapreduce.Job: Counters: 31
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=3713876
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=457344862
+                HDFS: Number of bytes written=0
+                HDFS: Number of read operations=100
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=0
+        Job Counters
+                Launched map tasks=22
+                Data-local map tasks=7
+                Rack-local map tasks=15
+                Total time spent by all maps in occupied slots (ms)=3690198
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=1845099
+                Total vcore-milliseconds taken by all map tasks=1845099
+                Total megabyte-milliseconds taken by all map tasks=3778762752
+        Map-Reduce Framework
+                Map input records=3002373
+                Map output records=3002373
+                Input split bytes=3826
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=2046
+                CPU time spent (ms)=140800
+                Physical memory (bytes) snapshot=7280193536
+                Virtual memory (bytes) snapshot=81865830400
+                Total committed heap usage (bytes)=5493489664
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=0
+18/10/06 14:54:04 INFO mapreduce.ExportJobBase: Transferred 436.158 MB in 142.2496 seconds (3.0661 MB/sec)
+18/10/06 14:54:04 INFO mapreduce.ExportJobBase: Exported 3002373 records.
+
+
+sqoop export \
+--connect jdbc:mysql://ms.itversity.com/h1b_export \
+--username h1b_user \
+--password itversity \
+--table h1b_data2_rajeshs \
+--export-dir "/public/h1b/h1b_data_to_be_exported" \
+--input-null-string  "NA" \
+--fields-terminated-by "\001" \
+-m 8
+
+
+mysql> select count(*) from h1b_data2_rajeshs where PREVAILING_WAGE='NA';
++----------+
+| count(*) |
++----------+
+|       30 |
++----------+
+1 row in set, 1 warning (1.74 sec)
+select count(*) from h1b_data2_rajeshs where PREVAILING_WAGE IS NOT NULL;
+
+
+mysql> select  PREVAILING_WAGE from h1b_data2_rajeshs where PREVAILING_WAGE='NA';
++-----------------+
+| PREVAILING_WAGE |
++-----------------+
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+|               0 |
+
+=======
+
+
+>>>>>>> ab5cf968864d2a50de53f18bb9f63fc98cbf1910
+
+
+
+15)
+
+Instructions
+Connect to the MySQL database on the itversity labs using sqoop and import data with case_status as CERTIFIED
+
+Data Description
+A MySQL instance is running on a remote node ms.itversity.com in the instance. You will find a table that contains 3002373 rows of h1b data
+
+MySQL database information:
+
+Installation on the node ms.itversity.com
+Database name is h1b_db
+Username: h1b_user
+Password: itversity
+Table name h1b_data
+Output Requirements
+Place the h1b related data in files in HDFS directory
+/user/`whoami`/problem15/solution/
+/user/rajeshs/itv_problems_practice/problem15/solution
+
+Replace `whoami` with your OS user name
+Use avro file format
+Load only those records which have case_status as CERTIFIED completely
+There are 2615623 such records
+End of Problem
+
+
+Answer :
+
+
+i ==>
+verify the tables from mysql : 
+
+mysql -u h1b_user -h ms.itversity.com -p
+password : itversity
+
+mysql> use h1b_db;
+mysql> show tables;
++------------------+
+| Tables_in_h1b_db |
++------------------+
+| h1b_data         |
++------------------+
+1 row in set (0.00 sec)
+
+mysql> select * from h1b_data limit 10;
+
+ii==> 
+verify the tables from sqoop eval :
+ 
+[rajeshs@gw02 ~]$ sqoop eval \
+ --connect jdbc:mysql://ms.itversity.com/h1b_db \
+ --username h1b_user \
+ --password itversity \
+ --query "show tables"
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 05:48:05 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 05:48:05 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 05:48:05 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+------------------------
+| Tables_in_h1b_db     |
+------------------------
+| h1b_data             |
+------------------------
+
+ sqoop eval \
+ --connect jdbc:mysql://ms.itversity.com/h1b_db \
+ --username h1b_user \
+ --password itversity \
+ --query "describe h1b_data"
+ [rajeshs@gw02 ~]$ sqoop eval \
+>  --connect jdbc:mysql://ms.itversity.com/h1b_db \
+>  --username h1b_user \
+>  --password itversity \
+>  --query "describe h1b_data"
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 05:49:51 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 05:49:51 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 05:49:52 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+---------------------------------------------------------------------------------------------------------
+| Field                | Type                 | Null | Key | Default              | Extra                |
+---------------------------------------------------------------------------------------------------------
+| ID                   | int(11)              | NO  | PRI | (null)               |                      |
+| CASE_STATUS          | varchar(50)          | YES |     | (null)               |                      |
+| EMPLOYER_NAME        | varchar(100)         | YES |     | (null)               |                      |
+| SOC_NAME             | varchar(100)         | YES |     | (null)               |                      |
+| JOB_TITLE            | varchar(100)         | YES |     | (null)               |                      |
+| FULL_TIME_POSITION   | varchar(50)          | YES |     | (null)               |                      |
+| PREVAILING_WAGE      | float                | YES |     | (null)               |                      |
+| YEAR                 | int(11)              | YES |     | (null)               |                      |
+| WORKSITE             | varchar(50)          | YES |     | (null)               |                      |
+| LONGITUDE            | varchar(50)          | YES |     | (null)               |                      |
+| LATITUDE             | varchar(50)          | YES |     | (null)               |                      |
+---------------------------------------------------------------------------------------------------------
+
+
+Final answer :
+
+ with default mappers :
+ 
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution \
+--where "CASE_STATUS = 'CERTIFIED'" 
+
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 05:51:00 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 05:51:00 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 05:51:01 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/07 05:51:01 INFO tool.CodeGenTool: Beginning code generation
+18/10/07 05:51:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 05:51:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 05:51:02 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/2ccc3a0bf27be3da51f34bb6d2f96178/h1b_data.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/07 05:51:04 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/2ccc3a0bf27be3da51f34bb6d2f96178/h1b_data.jar
+18/10/07 05:51:04 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/10/07 05:51:04 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/10/07 05:51:04 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/10/07 05:51:04 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/10/07 05:51:04 INFO mapreduce.ImportJobBase: Beginning import of h1b_data
+18/10/07 05:51:06 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/07 05:51:06 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/07 05:51:14 INFO db.DBInputFormat: Using read commited transaction isolation
+18/10/07 05:51:14 INFO db.DataDrivenDBInputFormat: BoundingValsQuery: SELECT MIN(`ID`), MAX(`ID`) FROM `h1b_data` WHERE ( CASE_STATUS = 'CERTIFIED' )
+18/10/07 05:51:16 INFO db.IntegerSplitter: Split size: 750569; Num splits: 4 from: 19 to: 3002295
+18/10/07 05:51:17 INFO mapreduce.JobSubmitter: number of splits:4
+18/10/07 05:51:17 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3957
+18/10/07 05:51:18 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3957
+18/10/07 05:51:18 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3957/
+18/10/07 05:51:18 INFO mapreduce.Job: Running job: job_1538287994192_3957
+18/10/07 05:51:27 INFO mapreduce.Job: Job job_1538287994192_3957 running in uber mode : false
+18/10/07 05:51:27 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/07 05:51:35 INFO mapreduce.Job:  map 25% reduce 0%
+18/10/07 05:51:37 INFO mapreduce.Job:  map 75% reduce 0%
+18/10/07 05:51:38 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/07 05:51:40 INFO mapreduce.Job: Job job_1538287994192_3957 completed successfully
+18/10/07 05:51:40 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=677200
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=434
+                HDFS: Number of bytes written=395559035
+                HDFS: Number of read operations=16
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=8
+        Job Counters
+                Launched map tasks=4
+                Other local map tasks=4
+                Total time spent by all maps in occupied slots (ms)=57106
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=28553
+                Total vcore-milliseconds taken by all map tasks=28553
+                Total megabyte-milliseconds taken by all map tasks=58476544
+        Map-Reduce Framework
+                Map input records=2615623
+                Map output records=2615623
+                Input split bytes=434
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=340
+                CPU time spent (ms)=26790
+                Physical memory (bytes) snapshot=1352974336
+                Virtual memory (bytes) snapshot=14889017344
+                Total committed heap usage (bytes)=1000341504
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=395559035
+18/10/07 05:51:40 INFO mapreduce.ImportJobBase: Transferred 377.2345 MB in 34.2756 seconds (11.0059 MB/sec)
+18/10/07 05:51:40 INFO mapreduce.ImportJobBase: Retrieved 2615623 records.
+
+
+with one mapper : 
+
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_with_one_mapper \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1
+
+[rajeshs@gw02 ~]$  sqoop import \
+> --connect jdbc:mysql://ms.itversity.com/h1b_db \
+> --username h1b_user \
+> --password itversity \
+> --table h1b_data \
+> --target-dir /user/rajeshs/itv_problems_practice/problem15/solution_with_one_mapper \
+> --where "CASE_STATUS = 'CERTIFIED'" \
+> -m 1
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 05:55:36 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 05:55:36 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 05:55:36 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/07 05:55:36 INFO tool.CodeGenTool: Beginning code generation
+18/10/07 05:55:36 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 05:55:37 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 05:55:37 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/e7476b24894aad3fb79bd5e1854cf3a2/h1b_data.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/07 05:55:38 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/e7476b24894aad3fb79bd5e1854cf3a2/h1b_data.jar
+18/10/07 05:55:38 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/10/07 05:55:38 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/10/07 05:55:38 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/10/07 05:55:38 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/10/07 05:55:38 INFO mapreduce.ImportJobBase: Beginning import of h1b_data
+18/10/07 05:55:40 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/07 05:55:40 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/07 05:55:53 INFO db.DBInputFormat: Using read commited transaction isolation
+18/10/07 05:55:53 INFO mapreduce.JobSubmitter: number of splits:1
+18/10/07 05:55:55 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3959
+18/10/07 05:55:56 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3959
+18/10/07 05:55:56 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3959/
+18/10/07 05:55:56 INFO mapreduce.Job: Running job: job_1538287994192_3959
+18/10/07 05:56:03 INFO mapreduce.Job: Job job_1538287994192_3959 running in uber mode : false
+18/10/07 05:56:03 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/07 05:56:20 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/07 05:56:21 INFO mapreduce.Job: Job job_1538287994192_3959 completed successfully
+18/10/07 05:56:21 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=169316
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=395559035
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=27682
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=13841
+                Total vcore-milliseconds taken by all map tasks=13841
+                Total megabyte-milliseconds taken by all map tasks=28346368
+        Map-Reduce Framework
+                Map input records=2615623
+                Map output records=2615623
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=150
+                CPU time spent (ms)=16020
+                Physical memory (bytes) snapshot=356343808
+                Virtual memory (bytes) snapshot=3721965568
+                Total committed heap usage (bytes)=254803968
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=395559035
+18/10/07 05:56:21 INFO mapreduce.ImportJobBase: Transferred 377.2345 MB in 41.4681 seconds (9.097 MB/sec)
+18/10/07 05:56:21 INFO mapreduce.ImportJobBase: Retrieved 2615623 records.
+
+
+Final solution -m 1 and save-as-avro
+
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_with_one_mapper_specific_columns \
+--columns "ID,CASE_STATUS" \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1
+
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem15/solution_with_one_mapper_specific_columns/part-m-00000 | head
+19,CERTIFIED
+20,CERTIFIED
+23,CERTIFIED
+24,CERTIFIED
+26,CERTIFIED
+28,CERTIFIED
+29,CERTIFIED
+30,CERTIFIED
+31,CERTIFIED
+32,CERTIFIED
+
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_final \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1 \
+--as-avrodatafile
+
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 06:09:58 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 06:09:58 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 06:09:59 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/07 06:09:59 INFO tool.CodeGenTool: Beginning code generation
+18/10/07 06:09:59 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 06:09:59 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 06:09:59 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/db080033eabf9f647a1d418f028c1201/h1b_data.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/07 06:10:00 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/db080033eabf9f647a1d418f028c1201/h1b_data.jar
+18/10/07 06:10:00 WARN manager.MySQLManager: It looks like you are importing from mysql.
+18/10/07 06:10:00 WARN manager.MySQLManager: This transfer can be faster! Use the --direct
+18/10/07 06:10:00 WARN manager.MySQLManager: option to exercise a MySQL-specific fast path.
+18/10/07 06:10:00 INFO manager.MySQLManager: Setting zero DATETIME behavior to convertToNull (mysql)
+18/10/07 06:10:00 INFO mapreduce.ImportJobBase: Beginning import of h1b_data
+18/10/07 06:10:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 06:10:02 INFO manager.SqlManager: Executing SQL statement: SELECT t.* FROM `h1b_data` AS t LIMIT 1
+18/10/07 06:10:02 INFO mapreduce.DataDrivenImportJob: Writing Avro schema file: /tmp/sqoop-rajeshs/compile/db080033eabf9f647a1d418f028c1201/h1b_data.avsc
+18/10/07 06:10:03 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/07 06:10:04 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/07 06:10:14 INFO db.DBInputFormat: Using read commited transaction isolation
+18/10/07 06:10:15 INFO mapreduce.JobSubmitter: number of splits:1
+18/10/07 06:10:16 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_3968
+18/10/07 06:10:18 INFO impl.YarnClientImpl: Submitted application application_1538287994192_3968
+18/10/07 06:10:19 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_3968/
+18/10/07 06:10:19 INFO mapreduce.Job: Running job: job_1538287994192_3968
+18/10/07 06:10:26 INFO mapreduce.Job: Job job_1538287994192_3968 running in uber mode : false
+18/10/07 06:10:26 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/07 06:10:58 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/07 06:10:59 INFO mapreduce.Job: Job job_1538287994192_3968 completed successfully
+18/10/07 06:10:59 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=170319
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=394497216
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=58564
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=29282
+                Total vcore-milliseconds taken by all map tasks=29282
+                Total megabyte-milliseconds taken by all map tasks=59969536
+        Map-Reduce Framework
+                Map input records=2615623
+                Map output records=2615623
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=156
+                CPU time spent (ms)=32870
+                Physical memory (bytes) snapshot=378974208
+                Virtual memory (bytes) snapshot=3726016512
+                Total committed heap usage (bytes)=259522560
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=394497216
+18/10/07 06:10:59 INFO mapreduce.ImportJobBase: Transferred 376.2219 MB in 57.4781 seconds (6.5455 MB/sec)
+18/10/07 06:10:59 INFO mapreduce.ImportJobBase: Retrieved 2615623 records.
+[rajeshs@gw02 ~]$
+
+
+verify the answer : 
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem15/solution_final
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 06:10 /user/rajeshs/itv_problems_practice/problem15/solution_final/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs  394497216 2018-10-07 06:10 /user/rajeshs/itv_problems_practice/problem15/solution_final/part-m-00000.avro
+[rajeshs@gw02 ~]$
+
+
+extra : 
+
+compress to avro (default) 
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1 \
+--as-avrodatafile \
+--compress 
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 06:17 /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs   98991567 2018-10-07 06:17 /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression/part-m-00000.avro
+
+
+compress to avro (snappy) 
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression_snappy \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1 \
+--as-avrodatafile \
+--compress \
+--compression-codec snappy
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression_snappy             
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 06:27 /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression_snappy/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs  144848462 2018-10-07 06:27 /user/rajeshs/itv_problems_practice/problem15/solution_avro_compression_snappy/part-m-00000.avro
+
+ sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--table h1b_data \
+--target-dir /user/rajeshs/itv_problems_practice/problem15/solution_parquetfile_compression_snappy \
+--where "CASE_STATUS = 'CERTIFIED'" \
+-m 1 \
+--as-avrodatafile \
+--compress \
+--compression-codec org.apache.hadoop.io.compress.SnappyCodec \
+--as-parquetfile 
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/itv_problems_practice/problem15/solution_parquetfile_compression_snappy
+Found 3 items
+drwxr-xr-x   - rajeshs hdfs          0 2018-10-07 06:38 /user/rajeshs/itv_problems_practice/problem15/solution_parquetfile_compression_snappy/.metadata
+drwxr-xr-x   - rajeshs hdfs          0 2018-10-07 06:39 /user/rajeshs/itv_problems_practice/problem15/solution_parquetfile_compression_snappy/.signals
+-rw-r--r--   2 rajeshs hdfs   77844059 2018-10-07 06:39 /user/rajeshs/itv_problems_practice/problem15/solution_parquetfile_compression_snappy/f0a7ee3e-2e97-48c6-abe8-aee8f7e48377.parquet
+
+
+/**************************************************************************************************************************************************************/
+
+
+16)
+
+Instructions
+Get NYSE data in ascending order by date and descending order by volume
+
+Data Description
+NYSE data with "," as delimiter is available in HDFS
+
+NYSE data information:
+
+HDFS location: /public/nyse
+There is no header in the data
+Output Requirements
+Save data back to HDFS
+Column order: stockticker, transactiondate, openprice, highprice, lowprice, closeprice, volume
+"stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume"
+File Format: text
+Delimiter: :
+Place the sorted NYSE data in the HDFS directory
+/user/rajeshs/itv_problems_practice/problem16/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+Answer :
+
+
+val nyse= sc.textFile("/public/nyse")
+
+scala> val nyse= sc.textFile("/public/nyse")
+nyse: org.apache.spark.rdd.RDD[String] = /public/nyse MapPartitionsRDD[1] at textFile at <console>:27
+
+scala> nyse.count
+res1: Long = 9384739
+
+scala> nyse.first
+res2: String = AA,19970101,47.82,47.82,47.82,47.82,0
+
+val nyseMap = nyse.map(x=>  {
+val n = x.split(",")
+(n(0),n(1),n(2).toFloat,n(3).toFloat,n(4).toFloat,n(5).toFloat,n(6).toFloat)
+})
+
+scala> val nyseMap = nyse.map(x=>  {
+     | val n = x.split(",")
+     | (n(0),n(1),n(2).toFloat,n(3).toFloat,n(4).toFloat,n(5).toFloat,n(6).toFloat)
+     | })
+nyseMap: org.apache.spark.rdd.RDD[(String, String, Float, Float, Float, Float, Float)] = MapPartitionsRDD[2] at map at <console>:29
+
+scala> nyseMap.first
+res3: (String, String, Float, Float, Float, Float, Float) = (AA,19970101,47.82,47.82,47.82,47.82,0.0)
+
+val nyseDF = nyseMap.toDF("stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume")
+scala> val nyseDF = nyseMap.toDF("stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume")
+nyseDF: org.apache.spark.sql.DataFrame = [stockticker: string, transactiondate: string, openprice: float, highprice: float, lowprice: float, closeprice: float, volume: float]
+
+scala> nyseDF.show(3)
++-----------+---------------+---------+---------+--------+----------+------+
+|stockticker|transactiondate|openprice|highprice|lowprice|closeprice|volume|
++-----------+---------------+---------+---------+--------+----------+------+
+|         AA|       19970101|    47.82|    47.82|   47.82|     47.82|   0.0|
+|        ABC|       19970101|     6.03|     6.03|    6.03|      6.03|   0.0|
+|        ABM|       19970101|     9.25|     9.25|    9.25|      9.25|   0.0|
++-----------+---------------+---------+---------+--------+----------+------+
+only showing top 3 rows
+
+scala> sqlContext.sql("select * from nyse order by transactiondate asc,volume desc").show(3)
++-----------+---------------+---------+---------+--------+----------+---------+
+|stockticker|transactiondate|openprice|highprice|lowprice|closeprice|   volume|
++-----------+---------------+---------+---------+--------+----------+---------+
+|        STZ|       19970101|     3.36|     3.44|    3.36|      3.44|4160000.0|
+|        ATI|       19970101|     38.5|     38.5|   36.73|     36.95| 264950.0|
+|        REV|       19970101|    29.63|    29.88|   29.63|     29.63|  42500.0|
++-----------+---------------+---------+---------+--------+----------+---------+
+only showing top 3 rows
+
+
+val result = sqlContext.sql("select * from nyse order by transactiondate asc,volume desc")
+
+ val result = sqlContext.sql("select * from nyse order by transactiondate asc,volume desc")
+result: org.apache.spark.sql.DataFrame = [stockticker: string, transactiondate: string, openprice: float, highprice: float, lowprice: float, closeprice: float, volume: float]
+
+result.map( x=> x.mkString(",")).coalesce(1).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem16/solution/")
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem16/solution/"
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 07:36 /user/rajeshs/itv_problems_practice/problem16/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs  419609800 2018-10-07 07:36 /user/rajeshs/itv_problems_practice/problem16/solution/part-00000
+[rajeshs@gw02 ~]$
+
+
+verify the answer :
+
+[rajeshs@gw02 ~]$ hdfs dfs -cat /user/rajeshs/itv_problems_practice/problem16/solution/part-00000 | head
+STZ,19970101,3.36,3.44,3.36,3.44,4160000.0
+ATI,19970101,38.5,38.5,36.73,36.95,264950.0
+REV,19970101,29.63,29.88,29.63,29.63,42500.0
+HMY,19970101,10.5,10.5,10.5,10.5,600.0
+BRK.A,19970101,34400.0,34400.0,34000.0,34100.0,290.0
+
+
+
+/**************************************************************************************************************************************************************/
+
+
+17)
+
+Instructions
+Get the stock tickers from NYSE data for which full name is missing in NYSE symbols data
+
+Data Description
+NYSE data with "," as delimiter is available in HDFS
+
+NYSE data information:
+
+HDFS location: /public/nyse
+There is no header in the data
+NYSE Symbols data with "\t" as delimiter is available in HDFS
+
+NYSE Symbols data information:
+
+HDFS location: /public/nyse_symbols
+First line is header and it should be included
+Output Requirements
+Get unique stock ticker for which corresponding names are missing in NYSE symbols data
+Save data back to HDFS
+File Format: avro
+Avro dependency details: 
+groupId -> com.databricks, artifactId -> spark-avro_2.10, version -> 2.0.1
+Place the sorted NYSE data in the HDFS directory
+/user/`whoami`/problem17/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+
+Answer:
+
+val nyse_data = sc.textFile("/public/nyse")
+val nyse_symbols = sc.textFile("/public/nyse_symbols")
+
+scala> val nyse_data = sc.textFile("/public/nyse")
+nyse_data: org.apache.spark.rdd.RDD[String] = /public/nyse MapPartitionsRDD[49] at textFile at <console>:27
+
+scala> nyse_data.first
+res13: String = AA,19970101,47.82,47.82,47.82,47.82,0
+
+
+scala> val nyse_symbols = sc.textFile("/public/nyse_symbols")
+nyse_symbols: org.apache.spark.rdd.RDD[String] = /public/nyse_symbols MapPartitionsRDD[51] at textFile at <console>:27
+
+scala> nyse_symbols.first
+res14: String = Symbol  Description
+
+scala> nyse_symbols.take(3).foreach(println)
+Symbol  Description
+A       Agilent Technologies
+AA      Alcoa Corporation
+
+
+val nyse_dataDF = nyse_data.map(x=>  {
+val n = x.split(",")
+(n(0),n(1),n(2).toFloat,n(3).toFloat,n(4).toFloat,n(5).toFloat,n(6).toFloat)
+}).toDF("stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume")
+
+
+scala> val nyse_dataDF = nyse_data.map(x=>  {
+     | val n = x.split(",")
+     | (n(0),n(1),n(2).toFloat,n(3).toFloat,n(4).toFloat,n(5).toFloat,n(6).toFloat)
+     | }).toDF("stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume")
+nyse_dataDF: org.apache.spark.sql.DataFrame = [stockticker: string, transactiondate: string, openprice: float, highprice: float, lowprice: float, closeprice: float, volume: float]
+
+scala> nyse_dataDF.show(3)
++-----------+---------------+---------+---------+--------+----------+------+
+|stockticker|transactiondate|openprice|highprice|lowprice|closeprice|volume|
++-----------+---------------+---------+---------+--------+----------+------+
+|         AA|       19970101|    47.82|    47.82|   47.82|     47.82|   0.0|
+|        ABC|       19970101|     6.03|     6.03|    6.03|      6.03|   0.0|
+|        ABM|       19970101|     9.25|     9.25|    9.25|      9.25|   0.0|
++-----------+---------------+---------+---------+--------+----------+------+
+
+
+val nyse_symbolsDF = nyse_symbols.map(x=>  {
+val n = x.split("\t")
+(n(0),n(1))
+}).toDF("Symbol","Description")
+
+scala> val nyse_symbolsDF = nyse_symbols.map(x=>  {
+     | val n = x.split("\t")
+     | (n(0),n(1))
+     | }).toDF("Symbol","Description")
+nyse_symbolsDF: org.apache.spark.sql.DataFrame = [Symbol: string, Description: string]
+
+scala> nyse_symbolsDF.show(4)
++------+--------------------+
+|Symbol|         Description|
++------+--------------------+
+|Symbol|         Description|
+|     A|Agilent Technologies|
+|    AA|   Alcoa Corporation|
+|   AAC|    Aac Holdings Inc|
++------+--------------------+
+only showing top 4 rows
+
+
+nyse_dataDF.registerTempTable("nysedata")
+nyse_symbolsDF.registerTempTable("symbol")
+
+
+sqlContext.sql("select distinct stockticker from nysedata left join symbol on stockticker=Symbol where Description is null ").show
+
+
+scala> sqlContext.sql("select distinct stockticker from nysedata left join symbol on stockticker=Symbol where Description is null ").count
+res31: Long = 99
+
+scala> sqlContext.sql("select stockticker from nysedata left join symbol on stockticker=Symbol where Description is null ").count
+res32: Long = 190279
+
+
+val result =sqlContext.sql("select distinct stockticker from nysedata left join symbol on stockticker=Symbol where Description is null ")
+
+scala> val result =sqlContext.sql("select distinct stockticker from nysedata left join symbol on stockticker=Symbol where Description is null ")
+result: org.apache.spark.sql.DataFrame = [stockticker: string]
+
+scala> result.count
+res11: Long = 99
+
+
+scala> import com.databricks.spark.avro._
+import com.databricks.spark.avro._
+
+ result.coalesce(1).write.avro("/user/rajeshs/itv_problems_practice/problem17/solution")
+
+verify the answer : 
+
+scala> sqlContext.read.avro("/user/rajeshs/itv_problems_practice/problem17/solution").show(5)
++-----------+
+|stockticker|
++-----------+
+|        STJ|
+|        DTZ|
+|        PPS|
+|         GI|
+|        CMN|
++-----------+
+only showing top 5 rows
+
+
+/**************************************************************************************************************************************************************/
+
+18)
+
+Instructions
+Get the name of stocks displayed along with other information
+
+Data Description
+NYSE data with "," as delimiter is available in HDFS
+
+NYSE data information:
+
+HDFS location: /public/nyse
+There is no header in the data
+NYSE Symbols data with tab character (\t) as delimiter is available in HDFS
+
+NYSE Symbols data information:
+
+HDFS location: /public/nyse_symbols
+First line is header and it should be included
+Output Requirements
+Get all NYSE details along with stock name if exists, if not stockname should be empty
+Column Order: stockticker, stockname, transactiondate, openprice, highprice, lowprice, closeprice, volume
+Delimiter: ,
+File Format: text
+Place the data in the HDFS directory
+/user/`whoami`/problem18/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+
+answer :
+
+
+
+val nyse_data = sc.textFile("/public/nyse")
+val nyse_symbols = sc.textFile("/public/nyse_symbols")
+
+
+val nyse_dataDF = nyse_data.map(x=>  {
+val n = x.split(",")
+(n(0),n(1),n(2).toFloat,n(3).toFloat,n(4).toFloat,n(5).toFloat,n(6).toFloat)
+}).toDF("stockticker","transactiondate","openprice","highprice","lowprice","closeprice","volume")
+
+
+
+
+val nyse_symbolsDF = nyse_symbols.map(x=>  {
+val n = x.split("\t")
+(n(0),n(1))
+}).toDF("Symbol","stockname")
+
+
+ nyse_dataDF.registerTempTable("nysedata")
+
+ nyse_symbolsDF.registerTempTable("symbol")
+
+ sqlContext.sql("select stockticker, stockname, transactiondate, openprice, highprice, lowprice, closeprice, volume  from nysedata left join symbol on stockticker=Symbol ")
+ 
+ 
+result.map(x=>x.mkString(",")).coalesce(1).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem18/solution")
+
+verify the answer :
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem18/solution"
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 11:12 /user/rajeshs/itv_problems_practice/problem18/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs  623936557 2018-10-07 11:12 /user/rajeshs/itv_problems_practice/problem18/solution/part-00000
+
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem18/solution").take(10).foreach(println)
+ADC,Agree Realty Corp,19980101,21.75,21.75,21.75,21.75,0.0
+ADC,Agree Realty Corp,19980102,21.5,22.0,21.5,21.5,9800.0
+ADC,Agree Realty Corp,19980105,22.06,22.06,21.69,21.87,13900.0
+ADC,Agree Realty Corp,19980106,21.81,21.81,20.69,20.94,34100.0
+
+
+/*********************************************************************************************************************/
+
+
+19)
+
+Instructions
+Get number of companies who filed LCAs for each year
+
+Data Description
+h1b data with ascii null "\0" as delimiter is available in HDFS
+
+h1b data information:
+
+HDFS Location: /public/h1b/h1b_data_noheader
+Fields: 
+ID, CASE_STATUS, EMPLOYER_NAME, SOC_NAME, JOB_TITLE, FULL_TIME_POSITION, PREVAILING_WAGE, YEAR, WORKSITE, LONGITUDE, LATITUDE
+Use EMPLOYER_NAME as the criteria to identify the company name to get number of companies
+YEAR is 8th field
+There are some LCAs for which YEAR is NA, ignore those records
+Output Requirements
+File Format: text
+Delimiter: tab character "\t"
+Output Field Order: year, lca_count
+Place the output files in the HDFS directory
+/user/`whoami`/problem19/solution/
+Replace `whoami` with your OS user name
+End of Problem
+
+Answer :
+
+
+val h1b_data_noheader = sc.textFile("/public/h1b/h1b_data_noheader")
+
+
+val h1b_dataDF = h1b_data_noheader.filter(x=> x.split("\0")(7) !="NA").map( x=> {
+val h =x.split("\0")
+(h(7),h(2))}).toDF("year","company_name")
+
+scala> val h1b_dataDF = h1b_data_noheader.filter(x=> x.split("\0")(7) !="NA").map( x=> {
+     | val h =x.split("\0")
+     | (h(7),h(2))}).toDF("year","company_name")
+h1b_dataDF: org.apache.spark.sql.DataFrame = [year: string, company_name: string]
+
+scala>
+
+scala> h1b_dataDF.registerTempTable("h1b")
+
+scala> h1b_dataDF.show(3)
++----+--------------------+
+|year|        company_name|
++----+--------------------+
+|2016|UNIVERSITY OF MIC...|
+|2016|GOODMAN NETWORKS,...|
+|2016|PORTS AMERICA GRO...|
++----+--------------------+
+only showing top 3 rows
+
+
+scala> val result = sqlContext.sql("select year,count(distinct company_name) lca_count from h1b group by year")
+result: org.apache.spark.sql.DataFrame = [year: string, lca_count: bigint]
+
+scala> result.show(3)
++----+---------+
+|year|lca_count|
++----+---------+
+|2011|    69817|
+|2012|    70101|
+|2013|    64186|
++----+---------+
+only showing top 3 rows
+
+
+result.coalesce(1).map(x=>x.mkString("\t")).saveAsTextFile("/user/rajeshs/itv_problems_practice/problem19/solution")
+
+verify the answer :
+
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem19/solution"
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 11:53 /user/rajeshs/itv_problems_practice/problem19/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs         66 2018-10-07 11:53 /user/rajeshs/itv_problems_practice/problem19/solution/part-00000
+
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem19/solution/").take(3).foreach(println)
+2011    69817
+2012    70101
+2013    64186
+
+
+
+/*********************************************************************************************************************/
+
+
+20)
+
+Instructions
+Connect to the MySQL database on the itversity labs using sqoop and import data with employer_name, case_status and count. Make sure data is sorted by employer_name in ascending order and by count in descending order
+
+Data Description
+A MySQL instance is running on a remote node ms.itversity.com in the instance. You will find a table that contains 3002373 rows of h1b data
+
+MySQL database information:
+
+Installation on the node ms.itversity.com
+Database name is h1b_db
+Username: h1b_user
+Password: itversity
+Table name h1b_data
+Output Requirements
+Place the h1b related data in files in HDFS directory
+/user/`whoami`/problem20/solution/
+Replace `whoami` with your OS user name
+Use text file format and tab (\t) as delimiter
+Hint: You can use Spark with JDBC or Sqoop import with query
+You might not get such hints in actual exam
+Output should contain employer name, case status and count
+End of Problem
+
+Answer :
+
+
+
+sqoop eval \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--query "describe h1b_data"
+
+---------------------------------------------------------------------------------------------------------
+| Field                | Type                 | Null | Key | Default              | Extra                |
+---------------------------------------------------------------------------------------------------------
+| ID                   | int(11)              | NO  | PRI | (null)               |                      |
+| CASE_STATUS          | varchar(50)          | YES |     | (null)               |                      |
+| EMPLOYER_NAME        | varchar(100)         | YES |     | (null)               |                      |
+| SOC_NAME             | varchar(100)         | YES |     | (null)               |                      |
+| JOB_TITLE            | varchar(100)         | YES |     | (null)               |                      |
+| FULL_TIME_POSITION   | varchar(50)          | YES |     | (null)               |                      |
+| PREVAILING_WAGE      | float                | YES |     | (null)               |                      |
+| YEAR                 | int(11)              | YES |     | (null)               |                      |
+| WORKSITE             | varchar(50)          | YES |     | (null)               |                      |
+| LONGITUDE            | varchar(50)          | YES |     | (null)               |                      |
+| LATITUDE             | varchar(50)          | YES |     | (null)               |                      |
+---------------------------------------------------------------------------------------------------------
+
+
+sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--query "select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data where \$CONDITIONS  group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc" \
+--target-dir "/user/rajeshs/itv_problems_practice/problem20/solution/" \
+--fields-terminated-by "\t" \
+-m 1
+
+
+select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS)  from h1b_data  group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc   limit 10;
+select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data  group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc  limit 10;
+
+select employer_name, case_status , count(1) count from h1b_data group by employer_name,case_status order by employer_name , count desc;
+
+
+mysql> select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data  group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc  limit 10;
++----------------------------------+-------------+-------+
+| EMPLOYER_NAME                    | CASE_STATUS | count |
++----------------------------------+-------------+-------+
+| NULL                             | WITHDRAWN   |    21 |
+| NULL                             | DENIED      |     5 |
+| NULL                             | CERTIFIED   |     2 |
+| &QUOT;K&QUOT; LINE AMERICA       | CERTIFIED   |     1 |
+| &QUOT;K&QUOT; LINE AMERICA, INC. | CERTIFIED   |     1 |
+| &TV COMMUNICATIONS INC           | WITHDRAWN   |     2 |
+| &TV COMMUNICATIONS INC           | CERTIFIED   |     1 |
+| &TV COMMUNICATIONS INC.          | CERTIFIED   |     3 |
+| &TV COMMUNICATIONS INC.          | DENIED      |     1 |
+| &TV COMMUNICATIONS INC.          | WITHDRAWN   |     1 |
++----------------------------------+-------------+-------+
+10 rows in set (43.52 sec)
+
+mysql> select employer_name, case_status , count(1) count from h1b_data group by employer_name,case_status order by employer_name , count desc limit 10;
++----------------------------------+-------------+-------+
+| employer_name                    | case_status | count |
++----------------------------------+-------------+-------+
+| NULL                             | WITHDRAWN   |    21 |
+| NULL                             | DENIED      |     5 |
+| NULL                             | CERTIFIED   |     2 |
+| &QUOT;K&QUOT; LINE AMERICA       | CERTIFIED   |     1 |
+| &QUOT;K&QUOT; LINE AMERICA, INC. | CERTIFIED   |     1 |
+| &TV COMMUNICATIONS INC           | WITHDRAWN   |     2 |
+| &TV COMMUNICATIONS INC           | CERTIFIED   |     1 |
+| &TV COMMUNICATIONS INC.          | CERTIFIED   |     3 |
+| &TV COMMUNICATIONS INC.          | DENIED      |     1 |
+| &TV COMMUNICATIONS INC.          | WITHDRAWN   |     1 |
++----------------------------------+-------------+-------+
+10 rows in set (28.52 sec)
+
+
+sqoop import \
+--connect jdbc:mysql://ms.itversity.com/h1b_db \
+--username h1b_user \
+--password itversity \
+--query "select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data where \$CONDITIONS  group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc" \
+--target-dir "/user/rajeshs/itv_problems_practice/problem20/solution/" \
+--fields-terminated-by "\t" \
+-m 1
+
+Warning: /usr/hdp/2.6.5.0-292/accumulo does not exist! Accumulo imports will fail.
+Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+18/10/07 13:57:43 INFO sqoop.Sqoop: Running Sqoop version: 1.4.6.2.6.5.0-292
+18/10/07 13:57:43 WARN tool.BaseSqoopTool: Setting your password on the command-line is insecure. Consider using -P instead.
+18/10/07 13:57:43 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+18/10/07 13:57:43 INFO tool.CodeGenTool: Beginning code generation
+18/10/07 13:57:44 INFO manager.SqlManager: Executing SQL statement: select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data where  (1 = 0)   group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc
+18/10/07 13:57:44 INFO manager.SqlManager: Executing SQL statement: select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data where  (1 = 0)   group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc
+18/10/07 13:57:44 INFO manager.SqlManager: Executing SQL statement: select  EMPLOYER_NAME,CASE_STATUS,count(CASE_STATUS) count  from h1b_data where  (1 = 0)   group by EMPLOYER_NAME,CASE_STATUS order by EMPLOYER_NAME asc, count desc
+18/10/07 13:57:44 INFO orm.CompilationManager: HADOOP_MAPRED_HOME is /usr/hdp/2.6.5.0-292/hadoop-mapreduce
+Note: /tmp/sqoop-rajeshs/compile/6a63d2b19fd61bba60de9b258b3204b9/QueryResult.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+18/10/07 13:57:45 INFO orm.CompilationManager: Writing jar file: /tmp/sqoop-rajeshs/compile/6a63d2b19fd61bba60de9b258b3204b9/QueryResult.jar
+18/10/07 13:57:45 INFO mapreduce.ImportJobBase: Beginning query import.
+18/10/07 13:57:46 INFO client.RMProxy: Connecting to ResourceManager at rm01.itversity.com/172.16.1.106:8050
+18/10/07 13:57:47 INFO client.AHSProxy: Connecting to Application History server at rm01.itversity.com/172.16.1.106:10200
+18/10/07 13:57:54 INFO db.DBInputFormat: Using read commited transaction isolation
+18/10/07 13:57:54 INFO mapreduce.JobSubmitter: number of splits:1
+18/10/07 13:57:55 INFO mapreduce.JobSubmitter: Submitting tokens for job: job_1538287994192_4234
+18/10/07 13:57:55 INFO impl.YarnClientImpl: Submitted application application_1538287994192_4234
+18/10/07 13:57:55 INFO mapreduce.Job: The url to track the job: http://rm01.itversity.com:19288/proxy/application_1538287994192_4234/
+18/10/07 13:57:55 INFO mapreduce.Job: Running job: job_1538287994192_4234
+18/10/07 13:58:04 INFO mapreduce.Job: Job job_1538287994192_4234 running in uber mode : false
+18/10/07 13:58:04 INFO mapreduce.Job:  map 0% reduce 0%
+18/10/07 13:58:41 INFO mapreduce.Job:  map 100% reduce 0%
+18/10/07 13:58:42 INFO mapreduce.Job: Job job_1538287994192_4234 completed successfully
+18/10/07 13:58:43 INFO mapreduce.Job: Counters: 30
+        File System Counters
+                FILE: Number of bytes read=0
+                FILE: Number of bytes written=168843
+                FILE: Number of read operations=0
+                FILE: Number of large read operations=0
+                FILE: Number of write operations=0
+                HDFS: Number of bytes read=87
+                HDFS: Number of bytes written=12535986
+                HDFS: Number of read operations=4
+                HDFS: Number of large read operations=0
+                HDFS: Number of write operations=2
+        Job Counters
+                Launched map tasks=1
+                Other local map tasks=1
+                Total time spent by all maps in occupied slots (ms)=71192
+                Total time spent by all reduces in occupied slots (ms)=0
+                Total time spent by all map tasks (ms)=35596
+                Total vcore-milliseconds taken by all map tasks=35596
+                Total megabyte-milliseconds taken by all map tasks=72900608
+        Map-Reduce Framework
+                Map input records=332714
+                Map output records=332714
+                Input split bytes=87
+                Spilled Records=0
+                Failed Shuffles=0
+                Merged Map outputs=0
+                GC time elapsed (ms)=97
+                CPU time spent (ms)=3900
+                Physical memory (bytes) snapshot=306720768
+                Virtual memory (bytes) snapshot=3712962560
+                Total committed heap usage (bytes)=245366784
+        File Input Format Counters
+                Bytes Read=0
+        File Output Format Counters
+                Bytes Written=12535986
+18/10/07 13:58:43 INFO mapreduce.ImportJobBase: Transferred 11.9552 MB in 56.2201 seconds (217.7543 KB/sec)
+18/10/07 13:58:43 INFO mapreduce.ImportJobBase: Retrieved 332714 records.
+
+
+
+verify the answer : 
+
+hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem20/solution/"
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls "/user/rajeshs/itv_problems_practice/problem20/solution/"
+Found 2 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-07 13:58 /user/rajeshs/itv_problems_practice/problem20/solution/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs   12535986 2018-10-07 13:58 /user/rajeshs/itv_problems_practice/problem20/solution/part-m-00000
+[rajeshs@gw02 ~]$
+
+
+scala> sc.textFile("/user/rajeshs/itv_problems_practice/problem20/solution/part-m-00000").take(10).foreach(println)
+null    WITHDRAWN       21
+null    DENIED  5
+null    CERTIFIED       2
+&QUOT;K&QUOT; LINE AMERICA      CERTIFIED       1
+&QUOT;K&QUOT; LINE AMERICA, INC.        CERTIFIED       1
+&TV COMMUNICATIONS INC  WITHDRAWN       2
+&TV COMMUNICATIONS INC  CERTIFIED       1
+&TV COMMUNICATIONS INC. CERTIFIED       3
+&TV COMMUNICATIONS INC. DENIED  1
+&TV COMMUNICATIONS INC. WITHDRAWN       1
+

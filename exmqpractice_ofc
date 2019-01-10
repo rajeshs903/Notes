@@ -1,0 +1,277 @@
+// hdfs dfs -mkdir /user/rajeshs/questions/
+
+// [cloudera@quickstart retail_db]$ pwd
+// /home/cloudera/data/retail_db
+
+
+
+/*
+1) sqoop import with only few columns
+Sqoop import from account table only with selected columns
+only order_status that are completed
+
+sqoop eval --connect jdbc:mysql://quickstart.cloudera:3306/retail_db --username root --P --query "select * from order_items limit 10"
+password : cloudera
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--target-dir /user/rajeshs/questions/problem1 \
+-m 1 \
+--fields-terminated-by "\t"
+
+sqoop import \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username root \
+--password cloudera \
+--table orders \
+--target-dir /user/rajeshs/questions/problem1 \
+--where "order_id < 100" \
+--columns "order_id,order_status,order_date" \
+-m 1 \
+--fields-terminated-by "\t"
+
+=======
+>>>>>>> 0bd0d8520c22c6cb63e9adfcbbc0c053396e3243
+*/
+
+
+/*
+2) sqoop export with tab delimited data ..export to mysql provided table
+Sqoop export 25 million records. data was tab delimited in hdfs
+
+mysql -u retail_dba -h quickstart -p
+password : cloudera
+
+or 
+
+mysql -u retail_dba -h nn01.itversity.com -p
+password : itversity
+
+
+CREATE TABLE `orders_exported2` (
+  `order_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order_date` datetime NOT NULL,
+  `order_status` varchar(45) NOT NULL,
+  PRIMARY KEY (`order_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=68884 DEFAULT CHARSET=utf8 
+
+
+*/
+
+
+input data : 
+hdfs dfs -cat /user/rajeshs/sqoop_import/retail_db/orders/part-m-00000 | head
+
+
+export command :
+
+sqoop export \
+--connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
+--username retail_dba \
+--password cloudera \
+--table orders_exported2 \
+--export-dir /user/rajeshs/sqoop_import/retail_db/orders \
+--columns "order_id,order_date,order_status" \
+--input-fields-terminated-by "," \
+-m 12
+
+verification :
+
+select * from orders_exported2;
+
+/*
+3) select data where charge > 10$. Save as parquet gzip format
+Hive metastore table is given. Problem3 is the database and billing is the table
+name. Get the records from billing table where charges > 10. billing table in hive
+metastore need to read and charge>10 and save output as parquet file gzip compression.
+
+changed the logic to order_item_subtotal>299.95 as per dataset availability.
+
+scala> sqlContext.sql("use rajeshs_sqoop_import")
+scala> sqlContext.sql("show tables").show
+scala> sqlContext.sql("select * from orc_order_items").show
+sqlContext.sql("select * from orc_order_items where order_item_subtotal>299.95").show
+scala> val result3 = sqlContext.sql("select * from orc_order_items where order_item_subtotal>299.95")
+
+scala> sqlContext.getConf("spark.sql.parquet.compression.codec")
+res9: String = gzip
+
+scala> result3.write.parquet("/user/rajeshs/exam/office/problem3")
+
+[rajeshs@gw02 ~]$ hdfs dfs -ls -R /user/rajeshs/exam/office/problem3
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-11 04:56 /user/rajeshs/exam/office/problem3/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs        765 2018-10-11 04:56 /user/rajeshs/exam/office/problem3/_common_metadata
+-rw-r--r--   2 rajeshs hdfs       1582 2018-10-11 04:56 /user/rajeshs/exam/office/problem3/_metadata
+-rw-r--r--   2 rajeshs hdfs     148754 2018-10-11 04:56 /user/rajeshs/exam/office/problem3/part-r-00000-efb28ebd-c8fb-4c9e-bfae-2475623994a2.gz.parquet
+
+
+changing the compression from gzip to snappy:
+scala> sqlContext.setConf("spark.sql.parquet.compression.codec","Snappy")
+
+scala> sqlContext.getConf("spark.sql.parquet.compression.codec")
+res13: String = Snappy
+result3.write.parquet("/user/rajeshs/exam/office/problem3_snappy")
+[rajeshs@gw02 ~]$ hdfs dfs -ls /user/rajeshs/exam/office/problem3_snappy
+Found 4 items
+-rw-r--r--   2 rajeshs hdfs          0 2018-10-11 05:00 /user/rajeshs/exam/office/problem3_snappy/_SUCCESS
+-rw-r--r--   2 rajeshs hdfs        765 2018-10-11 05:00 /user/rajeshs/exam/office/problem3_snappy/_common_metadata
+-rw-r--r--   2 rajeshs hdfs       1607 2018-10-11 05:00 /user/rajeshs/exam/office/problem3_snappy/_metadata
+-rw-r--r--   2 rajeshs hdfs     350821 2018-10-11 05:00 /user/rajeshs/exam/office/problem3_snappy/part-r-00000-54f2a3ed-4ccd-4e81-a12c-74732b030df2.snappy.parquet
+
+scala> sqlContext.read.parquet("/user/rajeshs/exam/office/problem3_snappy/part-r-00000-54f2a3ed-4ccd-4e81-a12c-74732b030df2.snappy.parquet").show(4)
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|order_item_id|order_item_order_id|order_item_product_id|order_item_quantity|order_item_subtotal|order_item_product_price|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|            1|                  1|                  957|                  1|             299.98|                  299.98|
+|            9|                  5|                  957|                  1|             299.98|                  299.98|
+|           12|                  5|                  957|                  1|             299.98|                  299.98|
+|           15|                  7|                  957|                  1|             299.98|                  299.98|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+only showing top 4 rows
+
+scala> sqlContext.read.parquet("/user/rajeshs/exam/office/problem3_snappy").show(4)
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|order_item_id|order_item_order_id|order_item_product_id|order_item_quantity|order_item_subtotal|order_item_product_price|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|            1|                  1|                  957|                  1|             299.98|                  299.98|
+|            9|                  5|                  957|                  1|             299.98|                  299.98|
+|           12|                  5|                  957|                  1|             299.98|                  299.98|
+|           15|                  7|                  957|                  1|             299.98|                  299.98|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+only showing top 4 rows
+
+
+*/
+
+
+
+
+
+/*
+4) Given data in tab format, 8 columns total. get the first name, last name, state only.
+Save it as parquet snappy format.
+Customer data in text tab delim, needs to print first name, last name and state and
+save as parquet with snappy.
+
+spark-shell --master yarn --conf spark.ui.port=12229 --packages com.databricks:spark-avro_2.10:2.0.1
+spark-shell --master yarn --conf spark.ui.port=12229 --packages com.databricks:spark-csv_2.10:1.3.0
+
+val customers = sc.textFile("/user/rajeshs/sqoop_import/retail_db/customers")
+scala> val customers = sc.textFile("/user/rajeshs/sqoop_import/retail_db/customers").take(10).foreach(println)
+1,Richard,Hernandez,XXXXXXXXX,XXXXXXXXX,6303 Heather Plaza,Brownsville,TX,78521
+2,Mary,Barrett,XXXXXXXXX,XXXXXXXXX,9526 Noble Embers Ridge,Littleton,CO,80126
+3,Ann,Smith,XXXXXXXXX,XXXXXXXXX,3422 Blue Pioneer Bend,Caguas,PR,00725
+4,Mary,Jones,XXXXXXXXX,XXXXXXXXX,8324 Little Common,San Marcos,CA,92069
+5,Robert,Hudson,XXXXXXXXX,XXXXXXXXX,10 Crystal River Mall ,Caguas,PR,00725
+6,Mary,Smith,XXXXXXXXX,XXXXXXXXX,3151 Sleepy Quail Promenade,Passaic,NJ,07055
+7,Melissa,Wilcox,XXXXXXXXX,XXXXXXXXX,9453 High Concession,Caguas,PR,00725
+8,Megan,Smith,XXXXXXXXX,XXXXXXXXX,3047 Foggy Forest Plaza,Lawrence,MA,01841
+9,Mary,Perez,XXXXXXXXX,XXXXXXXXX,3616 Quaking Street,Caguas,PR,00725
+10,Melissa,Smith,XXXXXXXXX,XXXXXXXXX,8598 Harvest Beacon Plaza,Stafford,VA,22554
+customers: Unit = ()
+import com.databricks.spark.csv
+sqlContext.read.format("com.databricks.spark.csv").option("header", "false").option("inferSchema", "true").load("/user/rajeshs/sqoop_import/retail_db/customers").show
+scala> val customersDF = sqlContext.read.format("com.databricks.spark.csv").option("header", "false").option("inferSchema", "true").load("/user/rajeshs/sqoop_import/retail_db/customers").show
++---+-----------+---------+---------+---------+--------------------+-------------+---+-----+
+| C0|         C1|       C2|       C3|       C4|                  C5|           C6| C7|   C8|
++---+-----------+---------+---------+---------+--------------------+-------------+---+-----+
+|  1|    Richard|Hernandez|XXXXXXXXX|XXXXXXXXX|  6303 Heather Plaza|  Brownsville| TX|78521|
+|  2|       Mary|  Barrett|XXXXXXXXX|XXXXXXXXX|9526 Noble Embers...|    Littleton| CO|80126|
+|  3|        Ann|    Smith|XXXXXXXXX|XXXXXXXXX|3422 Blue Pioneer...|       Caguas| PR|  725|
+|  4|       Mary|    Jones|XXXXXXXXX|XXXXXXXXX|  8324 Little Common|   San Marcos| CA|92069|
+|  5|     Robert|   Hudson|XXXXXXXXX|XXXXXXXXX|10 Crystal River ...|       Caguas| PR|  725|
+
+*/
+
+scala> customersDF.where("C0<=10").show
++---+-------+---------+---------+---------+--------------------+-----------+---+-----+
+| C0|     C1|       C2|       C3|       C4|                  C5|         C6| C7|   C8|
++---+-------+---------+---------+---------+--------------------+-----------+---+-----+
+|  1|Richard|Hernandez|XXXXXXXXX|XXXXXXXXX|  6303 Heather Plaza|Brownsville| TX|78521|
+|  2|   Mary|  Barrett|XXXXXXXXX|XXXXXXXXX|9526 Noble Embers...|  Littleton| CO|80126|
+|  3|    Ann|    Smith|XXXXXXXXX|XXXXXXXXX|3422 Blue Pioneer...|     Caguas| PR|  725|
+|  4|   Mary|    Jones|XXXXXXXXX|XXXXXXXXX|  8324 Little Common| San Marcos| CA|92069|
+|  5| Robert|   Hudson|XXXXXXXXX|XXXXXXXXX|10 Crystal River ...|     Caguas| PR|  725|
+|  6|   Mary|    Smith|XXXXXXXXX|XXXXXXXXX|3151 Sleepy Quail...|    Passaic| NJ| 7055|
+|  7|Melissa|   Wilcox|XXXXXXXXX|XXXXXXXXX|9453 High Concession|     Caguas| PR|  725|
+|  8|  Megan|    Smith|XXXXXXXXX|XXXXXXXXX|3047 Foggy Forest...|   Lawrence| MA| 1841|
+|  9|   Mary|    Perez|XXXXXXXXX|XXXXXXXXX| 3616 Quaking Street|     Caguas| PR|  725|
+| 10|Melissa|    Smith|XXXXXXXXX|XXXXXXXXX|8598 Harvest Beac...|   Stafford| VA|22554|
++---+-------+---------+---------+---------+--------------------+-----------+---+-----+
+
+/*
+5) Provided almost similar data as previous.. except they change street column to
+address columns. Select count of customers based on each city and state.. save as text
+tab delimiter.
+*/
+
+
+/*
+6) String Manipulation, they provided many columns comma delimiter text format . Just
+want output as fname, lname, column name as “alias “ concatenation first character of
+fname and lname.
+Ex: Meghal Gandhi MGandhi.
+Save as parquet gzip format.
+*/
+
+
+/*
+7) Famous billing customers question.
+billing and customer in hdfs , both tab delimited, fins customer owed amount for
+single billing transaction. save fname space lname tab amount in text format.
+*/
+
+<<<<<<< HEAD
+=======
+/*
+4) Given data in tab format, 8 columns total. get the first name, last name, state only.
+Save it as parquet snappy format.
+Customer data in text tab delim, needs to print first name, last name and state and
+save as parquet with snappy.
+*/
+
+
+
+/*
+5) Provided almost similar data as previous.. except they change street column to
+address columns. Select count of customers based on each city and state.. save as text
+tab delimiter.
+*/
+
+
+/*
+6) String Manipulation, they provided many columns comma delimiter text format . Just
+want output as fname, lname, column name as “alias “ concatenation first character of
+fname and lname.
+Ex: Meghal Gandhi MGandhi.
+Save as parquet gzip format.
+*/
+
+
+/*
+7) Famous billing customers question.
+billing and customer in hdfs , both tab delimited, fins customer owed amount for
+single billing transaction. save fname space lname tab amount in text format.
+*/
+
+
+
+
+/*
+8) Parquet sensor data has given . Find the avg temperature based on phone model. save
+as comma delim text format
+*/
+
+
+
+/*
+9) Employee birthday anniversary report. Provided data in text with tab delim.
+Get the first name space last name, employee birthday Year/Month. sort by employee
+birthday only. if two birthdays are same then no need to sort by name.
+Ex: Meghal Gandhi 11/19
+*/
+
+

@@ -1,0 +1,136 @@
+[9:38 PM, 8/3/2018] RS: Hello Every one,
+
+Below are the list of questions 
+
+1)Sqoop import with ',' delimited text file with a where condition.
+  password option did not work so i used -P
+  
+2) sqoop export 25 million records. data was tab delimited in hdfs
+   password option did not work.i used -P and num-mappers 8.
+   
+3)billing table in hive metastore need to read and save the output with one filter charge>10 and save output as parquet file gzip compression
+
+4)Customer table in hdfs tab delimited, billing table in hdfs with tab or comma delimited 
+  they mentioned id as foriegn key and we need to get output of customer name, amount and save it in avro format.
+  
+5) Customer data in text but they did not mention the delimiter and save the output to avro format no compression.
+    Notes: I used hadoop fs -cat <filename> | head. The data was space delimited. but the Address file had data like "1123 xyz street."
+	       I could not figure out how to read address field. I had to skip this question as it was time taking.
+
+6) avro source and save it in json format with same column name
+
+7) customer data in text and need to print firstname, space, lastname
+
+8) first name, last name sort with first name and leave last name without sorting and save it in parquet snappy format
+
+9) Out of 20 columns in employee table which is in hdfs in text file format with tab delimiter 
+   need to output first 7 columns which has id, fname, lname and address details with pipe as delimiter and text file format
+   
+   
+ My Experience: As soon as the exam launched,i have opened sublime text editor and terminal window and increased the font size.
+                I used one terminal for spark-shell and other terminal for validation. 
+				Used just one terminal for spark-shell to solve all the problems.
+				I have done coding in sublime text and copied the code to terminal. 
+				Exam is time taking,its better if you remember all the commands instead of taking help from documentation.
+[9:38 PM, 8/3/2018] RS: Can I become a self-taught data scientist? by Priyam Kakati https://www.quora.com/Can-I-become-a-self-taught-data-scientist/answer/Priyam-Kakati?share=f8b8f366&srid=jhZ0
+[9:38 PM, 8/3/2018] RS: 1. Sqoop import applying where condition(id, fname, lname, city, country)with text file output and comma delimiter.
+
+*be good at --query, --where, delimiters, compressions and file format.
+
+
+2: Sqoop export around with 25M records (--tab delimiter)
+
+*straight forward question, before exporting need to check which delimiter they have used, for me in the question they didn't mention any delimited and when i check in hdfs the data is delimited with TAB
+
+
+3: billing table in hive metastore need to read and save the output with one filter charge>10.00 and save output as textfile (fname, lname, charge>10.00)
+
+4: Customer table in hdfs tab delimited, billing table in hdfs with tab delimited they mentioned id as foreign key and we need to get output of customer (fname,space,lname) in column and amount in another column
+
+    --sqlContext.sql("select concat(fname,'\t',lname), amount....)this went wrong for me 
+5: Avro source and save it in Parquet with Gzip format with same column name
+
+after execution you will get avro is not part of something .. don't get panic it will get stored even after throwing error
+
+6: customer data in text and need to print (firstname, space, lastname) in one column where city = 'TX'
+
+7: Avro file need to get customer details (id, fname,lname,address) and save it to parquet uncompressed
+
+8: first name, last name sort with last name and leave first name without sorting and save it in text(OP: lname, fname)
+
+9: Out of 20 columns in employee table which is in hdfs in text file format with tab delimiter need to output first 7 columns which has id, fname, lname and address details with pipe as delimiter and text file format
+    
+   val result = sc.textfile("path").map(rec=>rec.split("\t").map(x=>x(0)+"|"+x(1)+"|"+x(2)+"|"+x(3)+"|".....upto first 7 columns).saveAsTextFile("path")
+
+check the data in the given file before doing any problem(using head--will give first 10 )
+[9:38 PM, 8/3/2018] RS: For the file formats, i have noticed that when we write in particular format, if we use repartition(1) for dataframe or coalesce(1) for rdd, the writing process is  very quick.
+[9:38 PM, 8/3/2018] RS: Hello Every one,
+
+Below are the list of questions 
+
+1)Sqoop import with ',' delimited text file with a where condition.
+  password option did not work so i used -P
+  
+2) sqoop export 25 million records. data was tab delimited in hdfs
+   password option did not work.i used -P and num-mappers 8.
+   
+3)billing table in hive metastore need to read and save the output with one filter charge>10 and save output as parquet file gzip compression
+
+4)Customer table in hdfs tab delimited, billing table in hdfs with tab or comma delimited 
+  they mentioned id as foriegn key and we need to get output of customer name, amount and save it in avro format.
+  
+5) Customer data in text but they did not mention the delimiter and save the output to avro format no compression.
+    Notes: I used hadoop fs -cat <filename> | head. The data was space delimited. but the Address file had data like "1123 xyz street."
+	       I could not figure out how to read address field. I had to skip this question as it was time taking.
+
+6) avro source and save it in json format with same column name
+
+7) customer data in text and need to print firstname, space, lastname
+
+8) first name, last name sort with first name and leave last name without sorting and save it in parquet snappy format
+
+9) Out of 20 columns in employee table which is in hdfs in text file format with tab delimiter 
+   need to output first 7 columns which has id, fname, lname and address details with pipe as delimiter and text file format
+   
+   
+ My Experience: As soon as the exam launched,i have opened sublime text editor and terminal window and increased the font size.
+                I used one terminal for spark-shell and other terminal for validation. 
+				Used just one terminal for spark-shell to solve all the problems.
+				I have done coding in sublime text and copied the code to terminal. 
+				Exam is time taking,its better if you remember all the commands instead of taking help from documentation.
+[9:38 PM, 8/3/2018] RS: sqoop import - -connect jdbc:mysql://quickstart:3306/retail_db  - -username=retail_dba  - -password=cloudera...........
+[9:38 PM, 8/3/2018] RS: also in the same question 5,  output -> avro format no compression  ,, is there a option like uncompressed for avro ?
+[9:38 PM, 8/3/2018] RS: Hello Every one,
+
+Below are the list of questions 
+
+1)Sqoop import with ',' delimited text file with a where condition.
+  password option did not work so i used -P
+  
+2) sqoop export 25 million records. data was tab delimited in hdfs
+   password option did not work.i used -P and num-mappers 8.
+   
+3)billing table in hive metastore need to read and save the output with one filter charge>10 and save output as parquet file gzip compression
+
+4)Customer table in hdfs tab delimited, billing table in hdfs with tab or comma delimited 
+  they mentioned id as foriegn key and we need to get output of customer name, amount and save it in avro format.
+  
+5) Customer data in text but they did not mention the delimiter and save the output to avro format no compression.
+    Notes: I used hadoop fs -cat <filename> | head. The data was space delimited. but the Address file had data like "1123 xyz street."
+	       I could not figure out how to read address field. I had to skip this question as it was time taking.
+
+6) avro source and save it in json format with same column name
+
+7) customer data in text and need to print firstname, space, lastname
+
+8) first name, last name sort with first name and leave last name without sorting and save it in parquet snappy format
+
+9) Out of 20 columns in employee table which is in hdfs in text file format with tab delimiter 
+   need to output first 7 columns which has id, fname, lname and address details with pipe as delimiter and text file format
+   
+   
+ My Experience: As soon as the exam launched,i have opened sublime text editor and terminal window and increased the font size.
+                I used one terminal for spark-shell and other terminal for validation. 
+				Used just one terminal for spark-shell to solve all the problems.
+				I have done coding in sublime text and copied the code to terminal. 
+				Exam is time taking,its better if you remember all the commands instead of taking help from documentation.

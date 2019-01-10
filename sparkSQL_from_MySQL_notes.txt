@@ -1,0 +1,118 @@
+mysql -u retail_dba -h nn01.itversity.com -p
+
+
+jdbc:mysql://nn01.itversity.com:3306/retail_db
+
+
+| customers_export_rajeshs | CREATE TABLE `customers_export_rajeshs` (
+  `customer_id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_fname` varchar(45) NOT NULL,
+  `customer_lname` varchar(45) NOT NULL,
+  `customer_email` varchar(45) NOT NULL,
+  `customer_password` varchar(45) NOT NULL,
+  `customer_zipcode` varchar(45) NOT NULL,
+  PRIMARY KEY (`customer_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=12436 DEFAULT CHARSET=utf8 |
+
+
+CREATE TABLE `customers_spark_rajeshs` (
+  `customer_id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_fname` varchar(45) NOT NULL,
+  `customer_lname` varchar(45) NOT NULL,
+  `customer_email` varchar(45) NOT NULL,
+  `customer_password` varchar(45) NOT NULL,
+  `customer_zipcode` varchar(45) NOT NULL,
+  PRIMARY KEY (`customer_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=12436 DEFAULT CHARSET=utf8 |
+
+
+mysql> show tables like '%rajeshs%';
++-------------------------------------+
+| Tables_in_retail_export (%rajeshs%) |
++-------------------------------------+
+| customers_export_rajeshs            |
+| customers_spark_rajeshs             |
+| employees_exported_rajeshs          |
+| rajeshs_timestamp_millsec           |
++-------------------------------------+
+4 rows in set (0.00 sec)
+
+
+select * from customers_spark_rajeshs;
+
+insert into customers_spark_rajeshs select customer_id,customer_fname,customer_lname,customer_email,customer_password,customer_zipcode from customers_export_rajeshs;
+
+mysql> insert into customers_spark_rajeshs select customer_id,customer_fname,customer_lname,customer_email,customer_password,customer_zipcode from customers_export_rajeshs;
+Query OK, 12435 rows affected (2.47 sec)
+Records: 12435  Duplicates: 0  Warnings: 0
+
+
+mysql> select * from customers_spark_rajeshs limit 10;
++-------------+----------------+----------------+----------------+-------------------+------------------+
+| customer_id | customer_fname | customer_lname | customer_email | customer_password | customer_zipcode |
++-------------+----------------+----------------+----------------+-------------------+------------------+
+|           1 | Richard        | Hernandez      | XXXXXXXXX      | XXXXXXXXX         | 78521            |
+|           2 | Mary           | Barrett        | XXXXXXXXX      | XXXXXXXXX         | 80126            |
+|           3 | Ann            | Smith          | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|           4 | Mary           | Jones          | XXXXXXXXX      | XXXXXXXXX         | 92069            |
+|           5 | Robert         | Hudson         | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|           6 | Mary           | Smith          | XXXXXXXXX      | XXXXXXXXX         | 07055            |
+|           7 | Melissa        | Wilcox         | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|           8 | Megan          | Smith          | XXXXXXXXX      | XXXXXXXXX         | 01841            |
+|           9 | Mary           | Perez          | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|          10 | Melissa        | Smith          | XXXXXXXXX      | XXXXXXXXX         | 22554            |
++-------------+----------------+----------------+----------------+-------------------+------------------+
+10 rows in set (0.00 sec)
+
+
+
+spark-shell --master yarn --conf spark.ui.port=11100 --conf spark.driver.extraClassPath=/home/rajeshs/jars_from_intellij/mysql-connector-java-5.1.6-bin.jar --packages="mysql:mysql-connector-java:5.1.6" --jars /home/rajeshs/jars_from_intellij/mysql-connector-java-5.1.6-bin.jar
+
+
+scala> val dataframe_mysqlss = spark.read.format(“jdbc”).option(“url”,
+| “jdbc:mysql://ms.itversity.com:3306/retail_db”).option(“driver”,
+| “com.mysql.jdbc.Driver”).option(“dbtable”, “orders”).option(“user”,
+| “retail_user”).option(“password”, “itversity”).load()
+dataframe_mysqlss: org.apache.spark.sql.DataFrame = [order_id: int, order_date: timestamp … 2 more fields]
+
+scala>
+
+
+val df_mysql= spark.read.format("jdbc").option("url","jdbc:mysql://nn01.itversity.com:3306/retail_db").option("driver","com.mysql.jdbc.Driver").option("dbtable","orders").option("user","retail_user").option("password","itversity").load()
+
+val df_mysql= spark.read.format("jdbc").option("url","jdbc:mysql://ms.itversity.com:3306/retail_db").option("driver","com.mysql.jdbc.Driver").option("dbtable","orders").option("user","retail_user").option("password","itversity").load()
+
+scala> val df_mysql= spark.read.format("jdbc").option("url","jdbc:mysql://ms.itversity.com:3306/retail_db").option("driver","com.mysql.jdbc.Driver").option("dbtable","orders").option("user","retail_user").option("password","itversity").load()
+df_mysql: org.apache.spark.sql.DataFrame = [order_id: int, order_date: timestamp ... 2 more fields]
+
+scala> df_mysql.show
++--------+-------------------+-----------------+---------------+
+|order_id|         order_date|order_customer_id|   order_status|
++--------+-------------------+-----------------+---------------+
+|       1|2013-07-25 00:00:00|            11599|         CLOSED|
+|       2|2013-07-25 00:00:00|              256|PENDING_PAYMENT|
+|       3|2013-07-25 00:00:00|            12111|       COMPLETE|
+|       4|2013-07-25 00:00:00|             8827|         CLOSED|
+|       5|2013-07-25 00:00:00|            11318|       COMPLETE|
+|       6|2013-07-25 00:00:00|             7130|       COMPLETE|
+
+
+
+mysql> insert into customers_spark_rajeshs_mini select customer_id,customer_fname,customer_lname,customer_email,customer_password,customer_zipcode from customers_spark_rajeshs where customer_id<=10;
+Query OK, 10 rows affected (0.07 sec)
+Records: 10  Duplicates: 0  Warnings: 0
+
+mysql> select * from customers_spark_rajeshs_mini;
++-------------+----------------+----------------+----------------+-------------------+------------------+
+| customer_id | customer_fname | customer_lname | customer_email | customer_password | customer_zipcode |
++-------------+----------------+----------------+----------------+-------------------+------------------+
+|           1 | Richard        | Hernandez      | XXXXXXXXX      | XXXXXXXXX         | 78521            |
+|           2 | Mary           | Barrett        | XXXXXXXXX      | XXXXXXXXX         | 80126            |
+|           3 | Ann            | Smith          | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|           4 | Mary           | Jones          | XXXXXXXXX      | XXXXXXXXX         | 92069            |
+|           5 | Robert         | Hudson         | XXXXXXXXX      | XXXXXXXXX         | 00725            |
+|           6 | Mary           | Smith          | XXXXXXXXX      | XXXXXXXXX         | 07055            |
+
+
+
+

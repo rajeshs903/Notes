@@ -1,0 +1,1001 @@
+
+
+/******************98. Different interfaces to run Hive queries*************Start************/
+
+
+spark-sql --master yarn --conf spark.ui.port=12567
+
+
+/******************98. Different interfaces to run Hive queries*************end************/
+
+
+/******************99. Create Hive tables and load data in text file format*************Start************/
+[rajeshs@gw02 conf]$ vi hive-site.xml
+
+
+hive (rajeshs_retail_db)> set hive.metastore.warehouse.dir;
+hive.metastore.warehouse.dir=/apps/hive/warehouse
+
+
+[rajeshs@gw02 orders]$ pwd
+/data/retail_db/orders
+[rajeshs@gw02 orders]$ ll
+total 2932
+-rw-r--r-- 1 root root 2999944 Feb 20  2017 part-00000
+
+
+create table orders_1 ( order_id int,
+order_date DATE,
+order_customer_id int,
+order_status string) 
+row format delimited fields terminated by ","
+stored as textfile;
+
+hive (rajeshs_retail_db)> load data local inpath '/data/retail_db/orders' into table orders_1;
+Loading data to table rajeshs_retail_db.orders_1
+Table rajeshs_retail_db.orders_1 stats: [numFiles=1, numRows=0, totalSize=2999944, rawDataSize=0]
+OK
+Time taken: 1.335 seconds
+hive (rajeshs_retail_db)>
+hive (rajeshs_retail_db)> select * from order_1 limit 10 ;
+FAILED: SemanticException [Error 10001]: Line 1:14 Table not found 'order_1'
+hive (rajeshs_retail_db)> select * from orders_1 limit 10;
+OK
+1       NULL    11599   CLOSED
+2       NULL    256     PENDING_PAYMENT
+3       NULL    12111   COMPLETE
+4       NULL    8827    CLOSED
+5       NULL    11318   COMPLETE
+6       NULL    7130    COMPLETE
+7       NULL    4530    COMPLETE
+8       NULL    2911    PROCESSING
+9       NULL    5657    PENDING_PAYMENT
+10      NULL    5648    PENDING_PAYMENT
+Time taken: 0.668 seconds, Fetched: 10 row(s)
+hive (rajeshs_retail_db)> alter table orders_1 CHANGE order_date order_date STRING ;
+OK
+Time taken: 0.494 seconds
+hive (rajeshs_retail_db)> show create table orders_1;
+OK
+CREATE TABLE `orders_1`(
+  `order_id` int,
+  `order_date` string,
+  `order_customer_id` int,
+  `order_status` string)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY ','
+STORED AS INPUTFORMAT
+  'org.apache.hadoop.mapred.TextInputFormat'
+OUTPUTFORMAT
+  'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION
+  'hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_retail_db.db/orders_1'
+TBLPROPERTIES (
+  'last_modified_by'='rajeshs',
+  'last_modified_time'='1537204039',
+  'numFiles'='1',
+  'numRows'='0',
+  'rawDataSize'='0',
+  'totalSize'='2999944',
+  'transient_lastDdlTime'='1537204039')
+Time taken: 0.154 seconds, Fetched: 21 row(s)
+
+
+hive (rajeshs_retail_db)> select * from orders_1 limit 10;
+OK
+1       2013-07-25 00:00:00.0   11599   CLOSED
+2       2013-07-25 00:00:00.0   256     PENDING_PAYMENT
+3       2013-07-25 00:00:00.0   12111   COMPLETE
+4       2013-07-25 00:00:00.0   8827    CLOSED
+5       2013-07-25 00:00:00.0   11318   COMPLETE
+6       2013-07-25 00:00:00.0   7130    COMPLETE
+7       2013-07-25 00:00:00.0   4530    COMPLETE
+8       2013-07-25 00:00:00.0   2911    PROCESSING
+9       2013-07-25 00:00:00.0   5657    PENDING_PAYMENT
+10      2013-07-25 00:00:00.0   5648    PENDING_PAYMENT
+Time taken: 0.25 seconds, Fetched: 10 row(s)
+
+hive (rajeshs_retail_db)> select ORDER_ID,substr(order_date,1,10),order_customer_id,order_status from orders_1 limit 10;
+OK
+1       2013-07-25      11599   CLOSED
+2       2013-07-25      256     PENDING_PAYMENT
+3       2013-07-25      12111   COMPLETE
+4       2013-07-25      8827    CLOSED
+5       2013-07-25      11318   COMPLETE
+6       2013-07-25      7130    COMPLETE
+7       2013-07-25      4530    COMPLETE
+8       2013-07-25      2911    PROCESSING
+9       2013-07-25      5657    PENDING_PAYMENT
+10      2013-07-25      5648    PENDING_PAYMENT
+
+
+hive (rajeshs_retail_db)> load data local inpath '/data/retail_db/orders' into table orders;
+Loading data to table rajeshs_retail_db.orders
+Table rajeshs_retail_db.orders stats: [numFiles=1, numRows=0, totalSize=2999944, rawDataSize=0]
+OK
+Time taken: 1.027 seconds
+
+
+hive (rajeshs_retail_db)> dfs -ls /apps/hive/warehouse/rajeshs_retail_db.db/orders;
+Found 1 items
+-rwxrwxrwx   3 rajeshs hdfs    2999944 2018-05-28 06:29 /apps/hive/warehouse/rajeshs_retail_db.db/orders/part-00000
+
+hive (rajeshs_retail_db)> select * from orders limit 10;
+OK
+1       2013-07-25 00:00:00.0   11599   CLOSED
+2       2013-07-25 00:00:00.0   256     PENDING_PAYMENT
+3       2013-07-25 00:00:00.0   12111   COMPLETE
+4       2013-07-25 00:00:00.0   8827    CLOSED
+5       2013-07-25 00:00:00.0   11318   COMPLETE
+6       2013-07-25 00:00:00.0   7130    COMPLETE
+7       2013-07-25 00:00:00.0   4530    COMPLETE
+8       2013-07-25 00:00:00.0   2911    PROCESSING
+9       2013-07-25 00:00:00.0   5657    PENDING_PAYMENT
+10      2013-07-25 00:00:00.0   5648    PENDING_PAYMENT
+Time taken: 0.207 seconds, Fetched: 10 row(s)
+
+
+
+
+create table order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float
+) row format delimited fields terminated by ","
+stored as textfile;
+
+
+
+hive (rajeshs_retail_db)> load data local inpath '/data/retail_db/order_items' into table order_items;
+Loading data to table rajeshs_retail_db.order_items
+Table rajeshs_retail_db.order_items stats: [numFiles=1, numRows=0, totalSize=5408880, rawDataSize=0]
+OK
+Time taken: 0.552 seconds
+
+hive (rajeshs_retail_db)> select * from order_items limit 10;
+OK
+1       1       957     1       299.98  299.98
+2       2       1073    1       199.99  199.99
+3       2       502     5       250.0   50.0
+4       2       403     1       129.99  129.99
+5       4       897     2       49.98   24.99
+6       4       365     5       299.95  59.99
+7       4       502     3       150.0   50.0
+8       4       1014    4       199.92  49.98
+9       5       957     1       299.98  299.98
+10      5       365     5       299.95  59.99
+Time taken: 0.249 seconds, Fetched: 10 row(s)
+hive (rajeshs_retail_db)>
+
+
+
+
+
+
+
+Final notes from resources:
+
+We can use Hive DDL and DML statements to create tables and get data into tables. We need to understand
+
+Create table command
+Columns and Data Types
+Row delimiter for text file format
+Other file formats
+Loading or Inserting data into Hive tables
+Creating tables and loading data
+Create database
+Create tables using text file format
+Make sure structure of data and the delimiters specified while creating tables are same
+If so, one can load data into Hive table using the load command
+create database dgadiraju_retail_db_txt;
+#create database rajeshs_retail_db
+use dgadiraju_retail_db_txt;
+#use  rajeshs_retail_db;
+
+create table orders (
+  order_id int,
+  order_date string,
+  order_customer_id int,
+  order_status string
+) row format delimited fields terminated by ','
+stored as textfile;
+
+load data local inpath '/data/retail_db/orders' into table orders;
+
+create table order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float
+) row format delimited fields terminated by ','
+stored as textfile;
+
+load data local inpath '/data/retail_db/order_items' into table order_items;
+
+
+
+
+/****/
+hive (rajeshs_retail_db)> show tables;
+OK
+order_items
+orders
+Time taken: 0.208 seconds, Fetched: 2 row(s)
+hive (rajeshs_retail_db)> select * from orders limit 10;
+OK
+1       2013-07-25 00:00:00.0   11599   CLOSED
+2       2013-07-25 00:00:00.0   256     PENDING_PAYMENT
+3       2013-07-25 00:00:00.0   12111   COMPLETE
+4       2013-07-25 00:00:00.0   8827    CLOSED
+5       2013-07-25 00:00:00.0   11318   COMPLETE
+6       2013-07-25 00:00:00.0   7130    COMPLETE
+7       2013-07-25 00:00:00.0   4530    COMPLETE
+8       2013-07-25 00:00:00.0   2911    PROCESSING
+9       2013-07-25 00:00:00.0   5657    PENDING_PAYMENT
+10      2013-07-25 00:00:00.0   5648    PENDING_PAYMENT
+Time taken: 0.827 seconds, Fetched: 10 row(s)
+hive (rajeshs_retail_db)> select * from order_items limit 10;
+OK
+1       1       957     1       299.98  299.98
+2       2       1073    1       199.99  199.99
+3       2       502     5       250.0   50.0
+4       2       403     1       129.99  129.99
+5       4       897     2       49.98   24.99
+6       4       365     5       299.95  59.99
+7       4       502     3       150.0   50.0
+8       4       1014    4       199.92  49.98
+9       5       957     1       299.98  299.98
+10      5       365     5       299.95  59.99
+Time taken: 0.226 seconds, Fetched: 10 row(s)
+hive (rajeshs_retail_db)>
+/***/
+
+
+/******************99. Create Hive tables and load data in text file format*************end************/
+
+
+
+/******************100. Create Hive tables and load data in ORC file format*************Start************/
+
+
+Create Database and Tables – ORC File Format
+Create database YOUR_USER_ID_retail_db_orc
+Create ORDERS and ORDER_ITEMS the tables for retail_db with
+file format as ORC
+Insert data into tables
+As our source data is text file format, we need to run insert command
+to convert data to ORC and store into the tables in new Database
+Creating tables and insert data
+Hive supports other file formats
+avro
+orc
+parquet
+sequencefile
+and more
+When we use special file formats, most likely
+Create staging table where structure matches data
+Create the table with the format you are interested in
+Use insert command to get data from stage table into the final table
+
+
+create database dgadiraju_retail_db_orc;
+use dgadiraju_retail_db_orc;
+
+create table orders (
+  order_id int,
+  order_date string,
+  order_customer_id int,
+  order_status string
+) stored as orc;
+#Dont need to mention the delimeter for fileformats other than text because they can store the metadata.
+
+insert into table orders select * from dgadiraju_retail_db_txt.orders;
+#We should use insert command here because we want to use the already loaded textfile data in hdfs in previous session.
+create table order_items (
+  order_item_id int,
+  order_item_order_id int,
+  order_item_product_id int,
+  order_item_quantity int,
+  order_item_subtotal float,
+  order_item_product_price float
+) stored as orc;
+
+insert into table order_items select * from dgadiraju_retail_db_txt.order_items;
+///Practice:===============
+hive (rajeshs_retail_db)> create database rajeshs_retail_db_orc;
+OK
+Time taken: 0.17 seconds
+hive (rajeshs_retail_db)> use rajeshs_retail_db_orc;
+OK
+Time taken: 0.02 seconds
+hive (rajeshs_retail_db_orc)> show tables;
+OK
+Time taken: 0.021 seconds
+
+hive (rajeshs_retail_db_orc)> create table orders (
+                               order_id int,
+                               order_date string,
+                               order_customer_id int,
+                               order_status string
+                             ) stored as orc;
+OK
+Time taken: 0.439 seconds
+hive (rajeshs_retail_db_orc)> create table order_items (
+                            >   order_item_id int,
+                            >   order_item_order_id int,
+                            >   order_item_product_id int,
+                            >   order_item_quantity int,
+                            >   order_item_subtotal float,
+                            >   order_item_product_price float
+                            > ) stored as orc;
+OK
+Time taken: 0.218 seconds
+hive (rajeshs_retail_db_orc)> show tables;
+OK
+order_items
+orders
+Time taken: 0.061 seconds, Fetched: 2 row(s)
+hive (rajeshs_retail_db_orc)> select * from orders;
+OK
+Time taken: 0.213 seconds
+hive (rajeshs_retail_db_orc)> select * from order_items;
+OK
+Time taken: 0.568 seconds
+
+#Inserting data from already existing table which is in the form of text:
+
+hive (rajeshs_retail_db_orc)> insert into table order_items select * from rajeshs_retail_db.order_items;
+Query ID = rajeshs_20180531124644_3dfa6b41-5a0c-45c2-85ab-4791e0a2063c
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks is set to 0 since there's no reduce operator
+Starting Job = job_1525279861629_30634, Tracking URL = http://rm01.itversity.com:19288/proxy/application_1525279861629_30634/
+Kill Command = /usr/hdp/2.5.0.0-1245/hadoop/bin/hadoop job  -kill job_1525279861629_30634
+Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 0
+2018-05-31 12:46:52,290 Stage-1 map = 0%,  reduce = 0%
+2018-05-31 12:46:58,534 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 4.78 sec
+MapReduce Total cumulative CPU time: 4 seconds 780 msec
+Ended Job = job_1525279861629_30634
+Stage-4 is selected by condition resolver.
+Stage-3 is filtered out by condition resolver.
+Stage-5 is filtered out by condition resolver.
+Moving data to directory hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_retail_db_orc.db/order_items/.hive-staging_hive_2018-05-31_12-46-44_200_4918617462267629178-1/-ext-10000
+Loading data to table rajeshs_retail_db_orc.order_items
+Table rajeshs_retail_db_orc.order_items stats: [numFiles=1, numRows=172198, totalSize=742945, rawDataSize=4132752]
+MapReduce Jobs Launched:
+Stage-Stage-1: Map: 1   Cumulative CPU: 4.78 sec   HDFS Read: 5414657 HDFS Write: 743043 SUCCESS
+Total MapReduce CPU Time Spent: 4 seconds 780 msec
+OK
+Time taken: 17.429 seconds
+hive (rajeshs_retail_db_orc)> dfs -ls hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_retail_db_orc.db/order_items;
+Found 1 items
+-rwxrwxrwx   3 rajeshs hdfs     742945 2018-05-31 12:46 hdfs://nn01.itversity.com:8020/apps/hive/warehouse/rajeshs_retail_db_orc.db/order_items/000000_0
+
+hive (rajeshs_retail_db_orc)> select * from order_items limit 10;
+OK
+1       1       957     1       299.98  299.98
+2       2       1073    1       199.99  199.99
+3       2       502     5       250.0   50.0
+4       2       403     1       129.99  129.99
+5       4       897     2       49.98   24.99
+6       4       365     5       299.95  59.99
+7       4       502     3       150.0   50.0
+8       4       1014    4       199.92  49.98
+9       5       957     1       299.98  299.98
+10      5       365     5       299.95  59.99
+Time taken: 0.193 seconds, Fetched: 10 row(s)
+
+
+
+///Practice:===============
+
+
+
+/******************100. Create Hive tables and load data in ORC file format*************end************/
+
+
+
+/******************101. Using spark-shell to run Hive queries or commands : ************Start ********/
+
+Running Hive Queries
+
+    Filtering (horizontal and vertical)
+    Functions
+    Row-level transformations
+    Joins
+    Aggregation
+    Sorting
+    Set Operations
+    Analytical Functions
+    Windowing Functions
+
+Run Basic Queries
+
+    Launch spark-shell by using the command => spark-shell –master yarn \
+    –conf spark.ui.port = 12345
+
+    Connect to hive database using sqlContext sqlContext.sql(“use dgadiraju_retail_db_txt”)
+    To list the tables use this query sqlContext.sql(“show tables”).show
+    To view the data in the table, use the query sqlContext.sql(“select * from orders limit 10″).show
+
+///Practice
+
+scala> sqlContext.sql("create database rajeshs_retail_db_orc")
+
+scala> sqlContext.sql("use rajeshs_retail_db_orc")
+res6: org.apache.spark.sql.DataFrame = [result: string]
+
+scala> sqlContext.sql("show tables").show
++-----------+-----------+
+|  tableName|isTemporary|
++-----------+-----------+
+|order_items|      false|
+|     orders|      false|
++-----------+-----------+
+
+scala> sqlContext.sql("select * from order_items limit 10").show
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|order_item_id|order_item_order_id|order_item_product_id|order_item_quantity|order_item_subtotal|order_item_product_price|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+|            1|                  1|                  957|                  1|             299.98|                  299.98|
+|            2|                  2|                 1073|                  1|             199.99|                  199.99|
+|            3|                  2|                  502|                  5|              250.0|                    50.0|
+|            4|                  2|                  403|                  1|             129.99|                  129.99|
+|            5|                  4|                  897|                  2|              49.98|                   24.99|
+|            6|                  4|                  365|                  5|             299.95|                   59.99|
+|            7|                  4|                  502|                  3|              150.0|                    50.0|
+|            8|                  4|                 1014|                  4|             199.92|                   49.98|
+|            9|                  5|                  957|                  1|             299.98|                  299.98|
+|           10|                  5|                  365|                  5|             299.95|                   59.99|
++-------------+-------------------+---------------------+-------------------+-------------------+------------------------+
+
+scala> sqlContext.sql("insert into table orders select * from rajeshs_retail_db.orders").show
+
+
+/******************101. Using spark-shell to run Hive queries or commands : ************end********/
+
+
+
+
+/****************** 102. Functions - Getting Started  ************Start********/
+As part of this topic, we will talk about functions.
+
+Connect to the hive and run the command show functions; to list-out the available functions
+To get the syntax of a particular function use describe function functionName
+
+/******************102. Functions - Getting Started  ************end********/
+
+
+
+
+
+/******************103. Functions - Manipulating Strings ************Start********/
+Spark SQL or Hive have a bunch of functions to apply transformations on the data.
+
+String manipulating functions
+Data manipulating functions
+Typecast functions
+Functions to deal with nulls
+Aggregating functions
+Conditional expressions
+and more
+
+
+substr or substring
+instr
+like
+rlike
+length
+lcase or lower
+ucase or upper
+initcap
+trim, ltrim, rtrim
+cast
+lpad, rpad
+split
+concat
+
+
+/******************103. Functions - Manipulating Strings ************end********/
+
+
+
+
+
+/******************104. Functions - Manipulating Dates************Start********/
+
+current_date
+current_timestamp
+date_add
+date_format
+date_sub
+datediff
+day
+dayofmonth
+to_date
+to_unix_timestamp
+to_utc_timestamp
+from_unixtime
+from_utc_timestamp
+minute
+month
+months_between
+next_day
+
+
+/****************** 104. Functions - Manipulating Dates************end********/
+
+
+
+
+
+/****************** 105. Functions - Aggregations************Start********/
+
+As part of this topic, we will talk about Aggregations very briefly.
+
+Some of the important aggregate functions are count, average, min, max, sum etc.
+To get number of records in a table we can use select count(1) from orders;
+To get the sum of order items we can use the query select sum(order_item_subtoatl) from order_items;
+Aggregate functions take multiple records as input and return one record as output.
+
+hive (rajeshs_retail_db)> select count(1) from orders;
+Total MapReduce CPU Time Spent: 5 seconds 400 msec
+OK
+68883
+Time taken: 26.116 seconds, Fetched: 1 row(s)
+hive (rajeshs_retail_db)>
+
+hive (rajeshs_retail_db)> select sum(order_item_subtotal) from order_items ;
+Total MapReduce CPU Time Spent: 8 seconds 390 msec
+OK
+3.432262059842491E7
+Time taken: 22.498 seconds, Fetched: 1 row(s)
+
+
+
+/******************105. Functions - Aggregations ************end********/
+
+
+
+
+
+/****************** 106. Functions - CASE************Start********/
+
+hive (rajeshs_retail_db)> select distinct order_status from orders;
+
+Total MapReduce CPU Time Spent: 5 seconds 450 msec
+OK
+CANCELED
+CLOSED
+COMPLETE
+ON_HOLD
+PAYMENT_REVIEW
+PENDING
+PENDING_PAYMENT
+PROCESSING
+SUSPECTED_FRAUD
+Time taken: 20.508 seconds, Fetched: 9 row(s)
+hive (rajeshs_retail_db)>
+
+hive (rajeshs_retail_db)> select  case
+                        > when order_status = 'CLOSED'  OR  order_status = 'CLOSED'  then 'No Action'
+                        > when order_status = 'ON_HOLD' OR order_status = 'PAYMENT_REVIEW' OR order_status = 'PENDING' OR order_status = 'PENDING_PAYMENT' OR order_status = 'PROCESSING' then 'Pending Action'
+                        > end from orders limit 10;
+OK
+No Action
+Pending Action
+NULL
+No Action
+NULL
+NULL
+NULL
+Pending Action
+Pending Action
+Pending Action
+Time taken: 0.293 seconds, Fetched: 10 row(s)
+hive (rajeshs_retail_db)>
+
+# Null because we didnt handle else condition
+
+            
+hive (rajeshs_retail_db)> select  case
+                        > when order_status = 'CLOSED'  OR  order_status = 'CLOSED'  then 'No Action'
+                        > when order_status = 'ON_HOLD' OR order_status = 'PAYMENT_REVIEW' OR order_status = 'PENDING' OR order_status = 'PENDING_PAYMENT' OR order_status = 'PROCESSING' then 'Pending Action'
+                        > else 'risky'
+                        > end from orders limit 10;
+OK
+No Action
+Pending Action
+risky
+No Action
+risky
+risky
+risky
+Pending Action
+Pending Action
+Pending Action
+Time taken: 0.205 seconds, Fetched: 10 row(s)
+
+select  case 
+ when order_status = 'CLOSED'  OR  order_status = 'CLOSED'  then 'No Action'
+ when order_status = 'ON_HOLD' OR order_status = 'PAYMENT_REVIEW' OR order_status = 'PENDING' OR order_status  = 'PENDING_PAYMENT' OR order_status = 'PROCESSING' then 'Pending Action'
+ else 'risky'
+ end from orders limit 10;
+
+No Action
+Pending Action
+risky
+No Action
+risky
+risky
+risky
+Pending Action
+Pending Action
+Pending Action
+Time taken: 0.221 seconds, Fetched: 10 row(s)
+
+
+
+select order_status,  case
+ when order_status = 'CLOSED'  OR  order_status = 'CLOSED'  then 'No Action'
+ when order_status = 'ON_HOLD' OR order_status = 'PAYMENT_REVIEW' OR order_status = 'PENDING' OR order_status  = 'PENDING_PAYMENT' OR order_status = 'PROCESSING' then 'Pending Action'
+ else 'risky'
+ end from orders limit 10;
+
+CLOSED  No Action
+PENDING_PAYMENT Pending Action
+COMPLETE        risky
+CLOSED  No Action
+COMPLETE        risky
+COMPLETE        risky
+COMPLETE        risky
+PROCESSING      Pending Action
+PENDING_PAYMENT Pending Action
+PENDING_PAYMENT Pending Action
+
+
+
+ we will be talking about a very important function called CASE and also nvl
+
+A CASE expression returns a value from the THEN portion of the clause.
+To view the syntax of case use describe function case;
+
+select order_status,
+       case  
+            when order_status IN ('CLOSED', 'COMPLETE') then 'No Action' 
+            when order_status IN ('ON_HOLD', 'PAYMENT_REVIEW', 'PENDING', 'PENDING_PAYMENT', 'PROCESSING') then 'Pending Action'
+            else 'Risky'
+       end from orders limit 10;
+
+CLOSED  No Action
+PENDING_PAYMENT Pending Action
+COMPLETE        No Action
+CLOSED  No Action
+COMPLETE        No Action
+COMPLETE        No Action
+COMPLETE        No Action
+PROCESSING      Pending Action
+PENDING_PAYMENT Pending Action
+PENDING_PAYMENT Pending Action
+Time taken: 0.205 seconds, Fetched: 10 row(s)
+
+/******************106. Functions - CASE ************end********/
+
+
+
+
+
+/****************** 107. Row level transformations************Start********/
+
+Let us explore how we can perform row-level transformations. First, let us check typical scenarios for row-level transformations.
+
+Data cleansing – removing special characters
+Standardization – eg: phone number, we might want to get phone numbers from different sources and it might be represented the different manner in different systems. When we get onto downstream systems we have to represent phone number in one standard format.
+Discarding or filtering out unnecessary data
+Unpivoting the data, one row with many columns might have to return a collection of rows
+
+
+hive (rajeshs_retail_db)> select * from orders limit 10;
+OK
+1       2013-07-25 00:00:00.0   11599   CLOSED
+2       2013-07-25 00:00:00.0   256     PENDING_PAYMENT
+3       2013-07-25 00:00:00.0   12111   COMPLETE
+4       2013-07-25 00:00:00.0   8827    CLOSED
+5       2013-07-25 00:00:00.0   11318   COMPLETE
+6       2013-07-25 00:00:00.0   7130    COMPLETE
+7       2013-07-25 00:00:00.0   4530    COMPLETE
+8       2013-07-25 00:00:00.0   2911    PROCESSING
+9       2013-07-25 00:00:00.0   5657    PENDING_PAYMENT
+10      2013-07-25 00:00:00.0   5648    PENDING_PAYMENT
+Time taken: 0.263 seconds, Fetched: 10 row(s)
+
+select * from orders limit 10;
+select concat(substr(order_date, 1,4), substr(order_date, 6,2)) from orders limit 10;
+OK
+201307
+201307
+201307
+201307
+201307
+201307
+201307
+201307
+201307
+201307
+Time taken: 0.252 seconds, Fetched: 10 row(s)
+
+select date_format('2013-07-25 00:00:00.0', 'YYYYMM');
+slect cast(date_format(order_date, 'YYYYMM') as int) from orders limit 100;
+
+scala> sqlContext.sql("select cast(date_format(order_date,'YYYYMMdd')as int) as yearmonth from orders_orc limit 10").show(false)
++---------+
+|yearmonth|
++---------+
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
+|20130725 |
++---------+
+
+
+
+
+
+/******************107. Row level transformations************end********/
+
+
+
+
+
+/******************108. Joins************Start********/
+Spark supports all possible join operations
+
+Inner join
+Outer join
+Here are the steps involved in using join operations
+
+Read data from files related to 2 datasets and convert into RDD
+Apply map to transform each data set into paired RDD
+Perform join using the paired RDDs
+Apply further transformations using relevant APIs
+Joins – Introduction
+Spark provides several APIs to facilitate joins
+
+join
+leftOuterJoin
+rightOuterJoin
+fullOuterJoin
+Typically joins are performed between 2 data sets with one too many relationships between them.
+
+Inner Join
+Following are the steps to perform join between 2 datasets
+
+Read both the data sets
+Apply map to convert datasets into paired RDDs
+Perform join on the paired RDDs
+Outer Join
+We can perform
+
+Left outer join using leftOuterJoin
+Right outer join using rightOuterJoin
+Full outer join using fullOuterJoin
+Full outer join is nothing but the union of left outer join and right outer join on the same data sets.
+
+
+
+
+select o.*, c.* from customers c left outer join orders o
+on o.order_customer_id = c.customer_id
+limit 10;
+
+select count(1) from orders o inner join customers c
+on o.order_customer_id = c.customer_id;
+
+select count(1) from customers c left outer join orders o
+on o.order_customer_id = c.customer_id;
+
+select c.* from customers c left outer join orders o
+on o.order_customer_id = c.customer_id
+where o.order_customer_id is null;
+
+
+
+/******************108. Joins************end********/
+
+
+
+
+
+/******************109. Aggregations ************Start********/
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000;
+
+/******************109. Aggregations ************end********/
+
+
+
+
+
+/******************110. Sorting ************Start********/
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000
+order by o.order_date, order_revenue desc;
+
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000
+distribute by o.order_date sort by o.order_date, order_revenue desc;
+
+
+/******************110. Sorting ************end********/
+
+
+
+
+
+/****************** 111. Set Operations************Start********/
+
+As part of this topic, we will talk about Set Operations
+
+Set operations are done on two datasets which are similar in nature
+
+
+select 1, "Hello"
+union all
+select 2, "World"
+union all
+select 1, "Hello"
+union all
+select 1, "World
+
+/****************** 111. Set Operations************end********/
+
+
+
+
+
+/******************112. Analytics Functions - Aggregations ************Start********/
+
+
+
+
+
+
+select o.order_id, o.order_date, o.order_status, round(sum(oi.order_item_subtotal), 2) order_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')
+group by o.order_id, o.order_date, o.order_status
+having sum(oi.order_item_subtotal) >= 1000
+distribute by o.order_date sort by o.order_date, order_revenue desc;
+
+
+
+
+
+Analytics functions and windowing functions provide powerful query mechanisms.
+
+Typically uses over clause along with partition by or order by or both
+Aggregations can be performed
+Ranking per partition can be easily achieved
+Moving averages can be implemented with windowing functions
+
+
+
+select * from (
+select o.order_id, o.order_date, o.order_status, oi.order_item_subtotal, 
+round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over (partition by o.order_id), 2) pct_revenue,
+round(avg(oi.order_item_subtotal) over (partition by o.order_id), 2) avg_revenue
+from orders o join order_items oi
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE', 'CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc, rank_revenue;
+
+
+
+/******************112. Analytics Functions - Aggregations ************end********/
+
+
+
+
+
+/****************** 113. Analytics Functions - Ranking ************Start********/
+
+
+/******************113. Analytics Functions - Ranking ************end********/
+
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+
+
+
+/****************** ************Start********/
+
+
+/****************** ************end********/
+

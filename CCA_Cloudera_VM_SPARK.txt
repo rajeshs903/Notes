@@ -1,0 +1,17 @@
+
+Data present at : /home/cloudera/data/retail_db/
+
+categories/
+customers/
+departments/
+order_items/
+orders/
+orders_column_mapping/
+orders_exported/
+products/
+t/
+
+val orders=sc.textFile("file:////home/cloudera/data/retail_db/orders/part-m-00000")
+val order_items=sc.textFile("file:////home/cloudera/data/retail_db/order_items/part-m-00000")
+val products=sc.textFile("file:////home/cloudera/data/retail_db/products/part-m-00000")
+

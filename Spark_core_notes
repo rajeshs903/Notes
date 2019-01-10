@@ -1,0 +1,2254 @@
+[rajeshs@gw02 ~]$ spark-shell --master yarn --conf spark.ui.port=12229 --packages com.databricks:spark-avro_2.10:2.0.1
+
+
+// RDD from files in HDFS
+
+
+// RDD from files in local file system
+val productsRaw = scala.io.Source.fromFile("/data/retail_db/products/part-00000").getLines.toList
+val products = sc.parallelize(productsRaw)
+
+
+
+
+val orders = sc.textFile("/public/retail_db/orders")
+
+// Previewing data
+orders.first
+orders.take(10).foreach(println)
+orders.count
+
+// Use collect with care. 
+// As it creates single threaded list from distributed RDD, 
+// using collect on larger datasets can cause out of memory issues.
+
+
+
+
+// Reading different file formats
+
+// JSON files are under this location on the lab
+// You can download from github as well and copy to HDFS
+hadoop fs -ls /public/retail_db_json/orders
+
+sqlContext.read.json("/public/retail_db_json/orders").show
+sqlContext.load("/public/retail_db_json/orders", "json").show
+
+
+
+
+
+
+
+
+
+//String Manipulation
+val str = orders.first
+val a = str.split(",")
+val orderId = a(0).toInt
+a(1).contains("2013")
+
+val orderDate = a(1)
+orderDate.substring(0, 10)
+orderDate.substring(5, 7)
+orderDate.substring(11)
+orderDate.replace('-', '/')
+orderDate.replace("07", "July")
+orderDate.indexOf("2")
+orderDate.indexOf("2", 2)
+orderDate.length
+
+
+val ordersRDD=sc.textFile("/user/rajeshs/sqoop_import/retail_db/orders/part-m-00000")
+
+
+val orders = sc.textFile("/public/retail_db/orders")
+// 21,2013-07-25 00:00:00.0,11599,CLOSED -> 20130725 as Int
+val str = orders.first
+str.split(",")(1).substring(0, 10).replace("-", "").toInt
+
+val orderDates = orders.map((str: String) => {
+  str.split(",")(1).substring(0, 10).replace("-", "").toInt
+})
+
+
+
+scala>  val orderPairedRDD = ordersRDD.map(o=>{
+     |      val i=o.split(",")
+     |      (i(0).toInt,i(1).substring(0,10).replace("-","").toInt)}
+     |      )
+orderPairedRDD: org.apache.spark.rdd.RDD[(Int, Int)] = MapPartitionsRDD[48] at map at <console>:33
+
+
+scala> orderPairedRDD
+res84: org.apache.spark.rdd.RDD[(Int, Int)] = MapPartitionsRDD[48] at map at <console>:33
+
+scala> orderPairedRDD.take(3).foreach(println)
+(1,20130725)
+(2,20130725)
+(3,20130725)
+
+
+// creating order_items RDD :
+
+
+scala> val order_items=sc.textFile("/user/rajeshs/sqoop_import/retail_db/order_items/part-m-00000")
+order_items: org.apache.spark.rdd.RDD[String] = /public/retail_db/order_items MapPartitionsRDD[50] at textFile at <console>:27
+
+
+scala> val order_items_paired_RDD= order_items.map(oi => {
+     |      (oi.split(",")(1).toInt,oi)
+     |      }
+     |      )
+order_items_paired_RDD: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[56] at map at <console>:29
+
+scala> order_items_paired_RDD.take(3).foreach(println)
+(1,1,1,957,1,299.98,299.98)
+(2,2,2,1073,1,199.99,199.99)
+(2,3,2,502,5,250.0,50.0)
+
+
+
+val l = List("Hello", "How are you doing", "Let us perform word count", "As part of the word count program", "we will see how many times each word repeat")
+val l_rdd = sc.parallelize(l)
+res24: Array[String] = Array(Hello, How are you doing, Let us perform word count, As part of the word count program, we will see how many times each word repeat)
+
+val l_map = l_rdd.map(ele => ele.split(" "))
+res25: Array[Array[String]] = Array(Array(Hello), Array(How, are, you, doing), Array(Let, us, perform, word, count), Array(As, part, of, the, word, count, program), Array(we, will, see, how, many, times, each, word, repeat))
+
+val l_flatMap = l_rdd.flatMap(ele => ele.split(" "))
+res26: Array[String] = Array(Hello, How, are, you, doing, Let, us, perform, word, count, As, part, of, the, word, count, program, we, will, see, how, many, times, each, word, repeat)
+
+
+val wordcount = l_flatMap.map(word => (word, "")).countByKey
+
+val wordcount = l_flatMap.map(word => (word, "")).countByKey
+
+
+// Filtering data
+orders.filter(order => order.split(",")(3) == "COMPLETE")
+orders.count
+orders.filter(order => order.split(",")(3) == "COMPLETE").count
+// Get all the orders from 2013-09 which are in closed or complete
+orders.map(order => order.split(",")(3)).distinct.collect.foreach(println)
+val ordersFiltered = orders.filter(order => {
+  val o = order.split(",")
+  (o(3) == "COMPLETE" || o(3) == "CLOSED") && (o(1).contains("2013-09"))
+})
+ordersFiltered.take(10).foreach(println)
+ordersFiltered.count
+
+
+
+
+/***********************70. Joining data sets - inner join***********Start*********************/
+
+paired 
+
+val orders = sc.textFile("/public/retail_db/orders")
+val orderitems=sc.textFile("public/retail_db/order_items")
+
+
+scala> orderitems.take(10).foreach(println)
+
+order_item_id(primary key),	order_item_order_id(foreign key),	order_item_product_id,	order_item_qty,	order_item_subtotal,	order_item_product price
+
+
+1,1,957,1,299.98,299.98
+2,2,1073,1,199.99,199.99
+3,2,502,5,250.0,50.0
+4,2,403,1,129.99,129.99
+5,4,897,2,49.98,24.99
+6,4,365,5,299.95,59.99
+7,4,502,3,150.0,50.0
+8,4,1014,4,199.92,49.98
+9,5,957,1,299.98,299.98
+10,5,365,5,299.95,59.99
+
+scala> orders.take(10).foreach(println)
+order_id(primary key),	order_date,	order_customer_id,	order_status
+
+1,2013-07-25 00:00:00.0,11599,CLOSED
+2,2013-07-25 00:00:00.0,256,PENDING_PAYMENT
+3,2013-07-25 00:00:00.0,12111,COMPLETE
+4,2013-07-25 00:00:00.0,8827,CLOSED
+5,2013-07-25 00:00:00.0,11318,COMPLETE
+6,2013-07-25 00:00:00.0,7130,COMPLETE
+7,2013-07-25 00:00:00.0,4530,COMPLETE
+8,2013-07-25 00:00:00.0,2911,PROCESSING
+9,2013-07-25 00:00:00.0,5657,PENDING_PAYMENT
+10,2013-07-25 00:00:00.0,5648,PENDING_PAYMENT
+
+scala>
+
+now we have to create paired RDD in order to join both the datasets.
+
+select which one is key and which will be the value ..
+ these (K,V ) can be created by MAP
+example here we take order_id as key order_date as value(date without timestamp)
+ 
+ val orderMap=orders.map(order=>(order.split(",")(0).toInt,order.split(",")(1).substring(0,10)))
+scala> orderMap.take(10).foreach(println)
+(1,2013-07-25)
+(2,2013-07-25)
+(3,2013-07-25)
+(4,2013-07-25)
+(5,2013-07-25)
+(6,2013-07-25)
+(7,2013-07-25)
+(8,2013-07-25)
+(9,2013-07-25)
+(10,2013-07-25)
+	
+
+scala> val orderItemsMap=orderitems.map(orderitem=>
+{
+val oitem=orderitem.split(",")
+(oitem(1).toInt,oitem(4).toFloat)
+}
+)
+orderItemsMap: org.apache.spark.rdd.RDD[(Int, Float)] = MapPartitionsRDD[11] at map at <console>:29
+
+
+scala> orderItemsMap.take(10).foreach(println)
+
+(1,299.98)
+(2,199.99)
+(2,250.0)
+(2,129.99)
+(4,49.98)
+(4,299.95)
+(4,150.0)
+(4,199.92)
+(5,299.98)
+(5,299.95)
+
+
+
+now let us join both of KV RDDs i.e orderMap and orderItemsMap
+
+scala> val ordersJoin=orderMap.join(orderItemsMap)
+ordersJoin: org.apache.spark.rdd.RDD[(Int, (String, Float))] = MapPartitionsRDD[14] at join at <console>:35
+
+scala> ordersJoin.first
+res20: (Int, (String, Float)) = (41234,(2014-04-04,109.94))
+
+scala> ordersJoin.take(10).foreach(println)
+
+(41234,(2014-04-04,109.94))
+(65722,(2014-05-23,119.98))
+(65722,(2014-05-23,400.0))
+(65722,(2014-05-23,399.98))
+(65722,(2014-05-23,199.95))
+(65722,(2014-05-23,199.98))
+(28730,(2014-01-18,299.95))
+(28730,(2014-01-18,50.0))
+(68522,(2014-06-05,329.99))
+(23776,(2013-12-20,199.99))
+
+
+Incase if you want to access it it normally after you converting into tuples, use _1 and _2 operaters as below
+
+scala> ordersJoin.map(x=> (x._1,x._2._1,x._2._2)).first
+res21: (Int, String, Float) = (41234,2014-04-04,109.94)
+
+
+/***********************70. Joining data sets - inner join***********end*********************/
+
+
+
+
+
+/***********************71. Joining data sets - outer join***********start*********************/
+
+# get all the orders ,which do not have corresponding entries in orderItems. 
+this can be done by using leftouterjoin.
+
+
+scala> orders.count
+res22: Long = 68883
+
+scala> orderitems.count
+res23: Long = 172198
+
+
+
+1-> convert the RDD to kv pair
+
+order_id is key
+complete record is value
+
+ val orderMap=orders.map(order=>(order.split(",")(0).toInt,order))
+
+scala> orderMap.first
+res24: (Int, String) = (1,1,2013-07-25 00:00:00.0,11599,CLOSED)
+
+scala> val orderMap=orders.map(order=>(order.split(",")(0).toInt,order))
+orderMap: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[18] at map at <console>:29
+scala> orderMap.first
+res28: (Int, String) = (1,1,2013-07-25 00:00:00.0,11599,CLOSED)
+
+scala> orderMap.take(10).foreach(println)
+
+(1,1,2013-07-25 00:00:00.0,11599,CLOSED)
+(2,2,2013-07-25 00:00:00.0,256,PENDING_PAYMENT)
+(3,3,2013-07-25 00:00:00.0,12111,COMPLETE)
+(4,4,2013-07-25 00:00:00.0,8827,CLOSED)
+(5,5,2013-07-25 00:00:00.0,11318,COMPLETE)
+(6,6,2013-07-25 00:00:00.0,7130,COMPLETE)
+(7,7,2013-07-25 00:00:00.0,4530,COMPLETE)
+(8,8,2013-07-25 00:00:00.0,2911,PROCESSING)
+(9,9,2013-07-25 00:00:00.0,5657,PENDING_PAYMENT)
+(10,10,2013-07-25 00:00:00.0,5648,PENDING_PAYMENT)
+
+
+
+
+now orderitem  kv
+
+scala> val orderItemsMap=orderitems.map(orderitem=>{
+     | val oi=orderitem.split(",")
+     | (oi(1).toInt,oi)})
+
+orderItemsMap: org.apache.spark.rdd.RDD[(Int, Array[String])] = MapPartitionsRDD[19] at map at <console>:29
+
+scala> orderItemsMap.first
+res30: (Int, Array[String]) = (1,Array(1, 1, 957, 1, 299.98, 299.98))
+
+scala> orderItemsMap.take(10).foreach(println)
+(1,[Ljava.lang.String;@203bb6cb)
+(2,[Ljava.lang.String;@740588f6)
+(2,[Ljava.lang.String;@61468f85)
+(2,[Ljava.lang.String;@5b156db4)
+(4,[Ljava.lang.String;@26e515f3)
+(4,[Ljava.lang.String;@7eff7be1)
+(4,[Ljava.lang.String;@2b90f91c)
+(4,[Ljava.lang.String;@5b985917)
+(5,[Ljava.lang.String;@555c851a)
+(5,[Ljava.lang.String;@5079dc23)
+
+we got arrays instead of records in place of value here
+ have to correct it now
+
+scala> val orderItemsMap=orderitems.map(orderitem=>{
+val oi=orderitem.split(",")
+(oi(1).toInt,orderitem)})
+
+scala> orderItemsMap.take(10).foreach(println)
+
+(1,1,1,957,1,299.98,299.98)
+(2,2,2,1073,1,199.99,199.99)
+(2,3,2,502,5,250.0,50.0)
+(2,4,2,403,1,129.99,129.99)
+(4,5,4,897,2,49.98,24.99)
+(4,6,4,365,5,299.95,59.99)
+(4,7,4,502,3,150.0,50.0)
+(4,8,4,1014,4,199.92,49.98)
+(5,9,5,957,1,299.98,299.98)
+(5,10,5,365,5,299.95,59.99)
+
+/*** concept **/
+now join (1,1,2013-07-25 00:00:00.0,11599,CLOSED)
+with 	 (1,1,1,957,1,299.98,299.98)
+
+out will be like this = (1,(1,2013-07-25 00:00:00.0,11599,CLOSED),(1,1,957,1,299.98,299.98))
+
+but in scala , there is SOME and NONE concept when you join.
+below is the example to understand 
+if you get the record from orderItems table for given orderID in order tables ,the record will be shown like this 
+==> in case of entry in orderitems table= (orderID,((orderID,2013-07-25 00:00:00.0,11599,CLOSED),SOME(1,orderID,957,1,299.98,299.98)))
+
+
+if  you do not find  the entry in orderItems table for given orderID in order tables ,the record will be shown like this (gets NONE instead os showing the record, as the record is not found)
+==> in case of entry in orderitems table= (orderID,((orderID,2013-07-25 00:00:00.0,11599,CLOSED),SOME(1,orderID,957,1,299.98,299.98)))
+==> in case of entry is not present in orderitems table=
+ (orderID,((orderID,2013-07-25 00:00:00.0,11599,CLOSED),None))
+
+/*** concept **/
+
+----> orderMap leftouterjoin with orderItemsMap  <----
+
+scala> val orderLeftJoinOrderItems = orderMap.leftOuterJoin(orderItemsMap)
+orderLeftJoinOrderItems: org.apache.spark.rdd.RDD[(Int, (String, Option[String]))] = MapPartitionsRDD[25] at leftOuterJoin at <console>:35
+
+scala> orderLeftJoinOrderItems.first
+res36: (Int, (String, Option[String])) = (41234,(41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT,Some(102921,41234,249,2,109.94,54.97)))
+
+scala> orderLeftJoinOrderItems.take(10).foreach(println)
+
+(41234,(41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT,Some(102921,41234,249,2,109.94,54.97)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164249,65722,365,2,119.98,59.99)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164250,65722,730,5,400.0,80.0)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164251,65722,1004,1,399.98,399.98)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164252,65722,627,5,199.95,39.99)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164253,65722,191,2,199.98,99.99)))
+(28730,(28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT,Some(71921,28730,365,5,299.95,59.99)))
+(28730,(28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT,Some(71922,28730,502,1,50.0,50.0)))
+(68522,(68522,2014-06-05 00:00:00.0,880,SUSPECTED_FRAUD,Some(171323,68522,127,1,329.99,329.99)))
+(23776,(23776,2013-12-20 00:00:00.0,4041,COMPLETE,Some(59498,23776,1073,1,199.99,199.99)))
+
+As you can see SOME data types, record entry found in orderitem RDD
+. lets take 50 first records, to see if there are any corresponding records found with None (i.e ORDER ID exists in ORDER , but not in ORDER_ITEMS)
+
+scala> orderLeftJoinOrderItems.take(50).foreach(println)
+(41234,(41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT,Some(102921,41234,249,2,109.94,54.97)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164249,65722,365,2,119.98,59.99)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164250,65722,730,5,400.0,80.0)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164251,65722,1004,1,399.98,399.98)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164252,65722,627,5,199.95,39.99)))
+(65722,(65722,2014-05-23 00:00:00.0,4077,COMPLETE,Some(164253,65722,191,2,199.98,99.99)))
+(28730,(28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT,Some(71921,28730,365,5,299.95,59.99)))
+(28730,(28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT,Some(71922,28730,502,1,50.0,50.0)))
+(68522,(68522,2014-06-05 00:00:00.0,880,SUSPECTED_FRAUD,Some(171323,68522,127,1,329.99,329.99)))
+(23776,(23776,2013-12-20 00:00:00.0,4041,COMPLETE,Some(59498,23776,1073,1,199.99,199.99)))
+(23776,(23776,2013-12-20 00:00:00.0,4041,COMPLETE,Some(59499,23776,403,1,129.99,129.99)))
+(5354,(5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT,None))
+(32676,(32676,2014-02-11 00:00:00.0,12194,PROCESSING,Some(81749,32676,365,1,59.99,59.99)))
+(32676,(32676,2014-02-11 00:00:00.0,12194,PROCESSING,Some(81750,32676,627,4,159.96,39.99)))
+(32676,(32676,2014-02-11 00:00:00.0,12194,PROCESSING,Some(81751,32676,191,3,299.97,99.99)))
+(32676,(32676,2014-02-11 00:00:00.0,12194,PROCESSING,Some(81752,32676,1073,1,199.99,199.99)))
+(4926,(4926,2013-08-24 00:00:00.0,8498,PROCESSING,Some(12324,4926,1014,4,199.92,49.98)))
+(4926,(4926,2013-08-24 00:00:00.0,8498,PROCESSING,Some(12325,4926,1073,1,199.99,199.99)))
+(4926,(4926,2013-08-24 00:00:00.0,8498,PROCESSING,Some(12326,4926,365,4,239.96,59.99)))
+(4926,(4926,2013-08-24 00:00:00.0,8498,PROCESSING,Some(12327,4926,957,1,299.98,299.98)))
+(38926,(38926,2014-03-22 00:00:00.0,8245,PROCESSING,Some(97183,38926,191,5,499.95,99.99)))
+(38926,(38926,2014-03-22 00:00:00.0,8245,PROCESSING,Some(97184,38926,502,5,250.0,50.0)))
+(38926,(38926,2014-03-22 00:00:00.0,8245,PROCESSING,Some(97185,38926,365,5,299.95,59.99)))
+(29270,(29270,2014-01-21 00:00:00.0,6187,PROCESSING,Some(73214,29270,365,5,299.95,59.99)))
+(29270,(29270,2014-01-21 00:00:00.0,6187,PROCESSING,Some(73215,29270,365,2,119.98,59.99)))
+(29270,(29270,2014-01-21 00:00:00.0,6187,PROCESSING,Some(73216,29270,1004,1,399.98,399.98)))
+(29270,(29270,2014-01-21 00:00:00.0,6187,PROCESSING,Some(73217,29270,627,4,159.96,39.99)))
+(29270,(29270,2014-01-21 00:00:00.0,6187,PROCESSING,Some(73218,29270,1004,1,399.98,399.98)))
+(40888,(40888,2014-04-02 00:00:00.0,4528,CLOSED,None))
+(51620,(51620,2014-06-13 00:00:00.0,2146,CLOSED,Some(128993,51620,1004,1,399.98,399.98)))
+(51620,(51620,2014-06-13 00:00:00.0,2146,CLOSED,Some(128994,51620,627,5,199.95,39.99)))
+(51620,(51620,2014-06-13 00:00:00.0,2146,CLOSED,Some(128995,51620,1014,2,99.96,49.98)))
+(51620,(51620,2014-06-13 00:00:00.0,2146,CLOSED,Some(128996,51620,502,4,200.0,50.0)))
+(51620,(51620,2014-06-13 00:00:00.0,2146,CLOSED,Some(128997,51620,1014,2,99.96,49.98)))
+(63852,(63852,2014-03-15 00:00:00.0,3490,SUSPECTED_FRAUD,Some(159613,63852,1073,1,199.99,199.99)))
+(63852,(63852,2014-03-15 00:00:00.0,3490,SUSPECTED_FRAUD,Some(159614,63852,627,2,79.98,39.99)))
+(63852,(63852,2014-03-15 00:00:00.0,3490,SUSPECTED_FRAUD,Some(159615,63852,1073,1,199.99,199.99)))
+(11852,(11852,2013-10-05 00:00:00.0,12192,SUSPECTED_FRAUD,Some(29630,11852,403,1,129.99,129.99)))
+(11852,(11852,2013-10-05 00:00:00.0,12192,SUSPECTED_FRAUD,Some(29631,11852,1004,1,399.98,399.98)))
+(11852,(11852,2013-10-05 00:00:00.0,12192,SUSPECTED_FRAUD,Some(29632,11852,804,1,19.99,19.99)))
+(11852,(11852,2013-10-05 00:00:00.0,12192,SUSPECTED_FRAUD,Some(29633,11852,502,2,100.0,50.0)))
+(49508,(49508,2014-05-29 00:00:00.0,6169,PENDING_PAYMENT,Some(123738,49508,627,4,159.96,39.99)))
+(49508,(49508,2014-05-29 00:00:00.0,6169,PENDING_PAYMENT,Some(123739,49508,1014,5,249.9,49.98)))
+(55194,(55194,2014-07-09 00:00:00.0,7868,COMPLETE,Some(138033,55194,365,1,59.99,59.99)))
+(55194,(55194,2014-07-09 00:00:00.0,7868,COMPLETE,Some(138034,55194,191,3,299.97,99.99)))
+(55194,(55194,2014-07-09 00:00:00.0,7868,COMPLETE,Some(138035,55194,1073,1,199.99,199.99)))
+(55194,(55194,2014-07-09 00:00:00.0,7868,COMPLETE,Some(138036,55194,1073,1,199.99,199.99)))
+(8390,(8390,2013-09-15 00:00:00.0,11288,PENDING_PAYMENT,Some(20952,8390,403,1,129.99,129.99)))
+(8390,(8390,2013-09-15 00:00:00.0,11288,PENDING_PAYMENT,Some(20953,8390,502,1,50.0,50.0)))
+(53926,(53926,2014-06-30 00:00:00.0,7003,COMPLETE,Some(134834,53926,365,2,119.98,59.99)))
+
+
+So as per the problem statement , we need only NONE type records , that too in the form of orders not tuples.
+So have to filter None records and present in the order form.
+so take one sample record.
+
+(40888,(40888,2014-04-02 00:00:00.0,4528,CLOSED,None))
+==> (x,(y,z)) .. 
+now you have to check if Z is none or not. if none then add it to result else ignore.
+
+ \\-> accessing tuple  rddname._1 = x
+ 					   rddname._2 =(y,z)
+ 					   rddname._2._2 =z
+
+first check the logic with 1 record  
+scala> val t =orderLeftJoinOrderItems.first
+t: (Int, (String, Option[String])) = (41234,(41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT,Some(102921,41234,249,2,109.94,54.97)))
+
+scala> t._1
+res44: Int = 41234
+
+scala> t._2
+res45: (String, Option[String]) = (41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT,Some(102921,41234,249,2,109.94,54.97))
+
+scala> t._2._2
+res46: Option[String] = Some(102921,41234,249,2,109.94,54.97)
+
+so if (t._2._2 == none) then it should be added to our result.
+
+scala> t._2._2==None
+res47: Boolean = false
+
+
+
+
+scala> val orderFilter= orderLeftJoinOrderItems.filter(order=> (order._2._2 ==None))
+orderFilter: org.apache.spark.rdd.RDD[(Int, (String, Option[String]))] = MapPartitionsRDD[26] at filter at <console>:37
+
+scala> orderFilter.first
+res48: (Int, (String, Option[String])) = (5354,(5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT,None))
+
+scala> orderFilter.take(10).foreach(println)
+
+(5354,(5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT,None))
+(40888,(40888,2014-04-02 00:00:00.0,4528,CLOSED,None))
+(62490,(62490,2014-01-22 00:00:00.0,8942,ON_HOLD,None))
+(63508,(63508,2014-02-28 00:00:00.0,1607,COMPLETE,None))
+(37370,(37370,2014-03-12 00:00:00.0,10541,COMPLETE,None))
+(12420,(12420,2013-10-09 00:00:00.0,449,PENDING,None))
+(1732,(1732,2013-08-03 00:00:00.0,2851,PENDING_PAYMENT,None))
+(1550,(1550,2013-08-02 00:00:00.0,3043,PENDING_PAYMENT,None))
+(2938,(2938,2013-08-10 00:00:00.0,116,COMPLETE,None))
+(21834,(21834,2013-12-06 00:00:00.0,12334,COMPLETE,None))
+
+
+scala> orderFilter.count
+
+res50: Long = 11452
+
+scala> orders.count
+res51: Long = 68883
+
+so total 11452 records out of 68883 records doesnt have order_items entries table
+
+now convert the tuple to record to show it is as order format.
+
+so out of (21834,(21834,2013-12-06 00:00:00.0,12334,COMPLETE,None))
+
+we only need (*****,(21834,2013-12-06 00:00:00.0,12334,COMPLETE,****))  i.e => tuple._2._1
+
+
+val orderFileteredMap=orderFilter.map(order=> order._2._1)
+
+ scala> orderFileteredMap.first
+res53: String = 5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT
+
+scala>  orderFileteredMap.take(10).foreach(println)
+
+5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT
+40888,2014-04-02 00:00:00.0,4528,CLOSED
+62490,2014-01-22 00:00:00.0,8942,ON_HOLD
+63508,2014-02-28 00:00:00.0,1607,COMPLETE
+37370,2014-03-12 00:00:00.0,10541,COMPLETE
+12420,2013-10-09 00:00:00.0,449,PENDING
+1732,2013-08-03 00:00:00.0,2851,PENDING_PAYMENT
+1550,2013-08-02 00:00:00.0,3043,PENDING_PAYMENT
+2938,2013-08-10 00:00:00.0,116,COMPLETE
+21834,2013-12-06 00:00:00.0,12334,COMPLETE
+
+This is the final output for the problem statement
+
+
+/*************We can do the same with rightOuterJoin as well as below.**********reversing the position of tables in syntax***********/
+
+ val orderRightJoinOrderItems = orderItemsMap.rightOuterJoin(orderMap)
+
+scala> orderRightJoinOrderItems.take(10).foreach(println)
+
+(41234,(Some(102921,41234,249,2,109.94,54.97),41234,2014-04-04 00:00:00.0,3182,PENDING_PAYMENT))
+(65722,(Some(164249,65722,365,2,119.98,59.99),65722,2014-05-23 00:00:00.0,4077,COMPLETE))
+(65722,(Some(164250,65722,730,5,400.0,80.0),65722,2014-05-23 00:00:00.0,4077,COMPLETE))
+(65722,(Some(164251,65722,1004,1,399.98,399.98),65722,2014-05-23 00:00:00.0,4077,COMPLETE))
+(65722,(Some(164252,65722,627,5,199.95,39.99),65722,2014-05-23 00:00:00.0,4077,COMPLETE))
+(65722,(Some(164253,65722,191,2,199.98,99.99),65722,2014-05-23 00:00:00.0,4077,COMPLETE))
+(28730,(Some(71921,28730,365,5,299.95,59.99),28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT))
+(28730,(Some(71922,28730,502,1,50.0,50.0),28730,2014-01-18 00:00:00.0,6069,PENDING_PAYMENT))
+(68522,(Some(171323,68522,127,1,329.99,329.99),68522,2014-06-05 00:00:00.0,880,SUSPECTED_FRAUD))
+(23776,(Some(59498,23776,1073,1,199.99,199.99),23776,2013-12-20 00:00:00.0,4041,COMPLETE))
+
+val ordersWithOrderItems=  orderRightJoinOrderItems.
+filter(order=>(order._2._1==None)).
+map(order=>order._2._2)
+
+ordersWithOrderItems.take(10).foreach(println)
+
+5354,2013-08-26 00:00:00.0,7616,PENDING_PAYMENT
+40888,2014-04-02 00:00:00.0,4528,CLOSED
+62490,2014-01-22 00:00:00.0,8942,ON_HOLD
+63508,2014-02-28 00:00:00.0,1607,COMPLETE
+37370,2014-03-12 00:00:00.0,10541,COMPLETE
+12420,2013-10-09 00:00:00.0,449,PENDING
+1732,2013-08-03 00:00:00.0,2851,PENDING_PAYMENT
+1550,2013-08-02 00:00:00.0,3043,PENDING_PAYMENT
+21834,2013-12-06 00:00:00.0,12334,COMPLETE
+2938,2013-08-10 00:00:00.0,116,COMPLETE
+
+
+/**********************************************71. Joining data sets - outer join***********end***************************************/
+
+
+
+/**************************73. Aggregations - using actions (reduce and countByKey) ************************* Start ********************/
+
+Total aggregations can be performed using actions
+
+count – gives the number of records in RDD
+reduce – used to perform aggregations such as sum, min, max etc on RDDs which contain numeric elements
+
+#PROBLEM STATEMENT
+#Find the number of orders present in each order_status (CLOSED,COMPLETED...etc)
+// Aggregations - using actions
+
+1) by using CountByValue (my own way)
+val orders = sc.textFile("/public/retail_db/orders")
+scala> orders.take(10).foreach(println)
+
+1,2013-07-25 00:00:00.0,11599,CLOSED
+2,2013-07-25 00:00:00.0,256,PENDING_PAYMENT
+3,2013-07-25 00:00:00.0,12111,COMPLETE
+4,2013-07-25 00:00:00.0,8827,CLOSED
+5,2013-07-25 00:00:00.0,11318,COMPLETE
+6,2013-07-25 00:00:00.0,7130,COMPLETE
+7,2013-07-25 00:00:00.0,4530,COMPLETE
+8,2013-07-25 00:00:00.0,2911,PROCESSING
+9,2013-07-25 00:00:00.0,5657,PENDING_PAYMENT
+10,2013-07-25 00:00:00.0,5648,PENDING_PAYMENT
+
+
+scala> val orderStatusCount = orders.map(orders=>orders.split(",")(3))
+orderStatusCount: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[40] at map at <console>:29
+scala> orderStatusCount.take(10).foreach(println)
+CLOSED
+PENDING_PAYMENT
+COMPLETE
+CLOSED
+COMPLETE
+COMPLETE
+COMPLETE
+PROCESSING
+PENDING_PAYMENT
+PENDING_PAYMENT
+
+scala> orderStatusCount.countByValue.foreach(println)
+
+(PAYMENT_REVIEW,729)
+(CLOSED,7556)
+(SUSPECTED_FRAUD,1558)
+(PROCESSING,8275)
+(COMPLETE,22899)
+(PENDING,7610)
+(PENDING_PAYMENT,15030)
+(ON_HOLD,3798)
+(CANCELED,1428)
+
+2) by using CountByKey (as in lecture)
+
+val orderStatusCountByKey = orders.map(orders=>(orders.split(",")(3),"")).countByKey
+
+orders.map(orders=>(orders.split(",")(3),"")).countByKey.foreach(println) |||or ||| orderStatusCountByKey.foreach(println)
+(PAYMENT_REVIEW,729)
+(CLOSED,7556)
+(SUSPECTED_FRAUD,1558)
+(PROCESSING,8275)
+(COMPLETE,22899)
+(PENDING,7610)
+(PENDING_PAYMENT,15030)
+(ON_HOLD,3798)
+(CANCELED,1428)
+
+
+## NEVER USE foreach ON RDD ### USE ONLY ON COLLECTION TYPES SUCH AS LIST, MAP ...etc 
+
+
+
+==> Reduce / ReduceByKey examples:
+
+## PROBLEM STATEMENT : compute the revenue for September 2013
+
+scala> val orderItems = sc.textFile("/public/retail_db/order_items")
+orderItems: org.apache.spark.rdd.RDD[String] = /public/retail_db/order_items MapPartitionsRDD[61] at textFile at <console>:27
+scala> orderItems.take(10).foreach(println)
+1,1,957,1,299.98,299.98
+2,2,1073,1,199.99,199.99
+3,2,502,5,250.0,50.0
+4,2,403,1,129.99,129.99
+5,4,897,2,49.98,24.99
+6,4,365,5,299.95,59.99
+7,4,502,3,150.0,50.0
+8,4,1014,4,199.92,49.98
+9,5,957,1,299.98,299.98
+10,5,365,5,299.95,59.99
+
+from above output calculate the revenue total.
+
+scala> val orderItemsRevenue=orderItems.map(oi=>(oi.split(",")(4).toFloat))
+orderItemsRevenue: org.apache.spark.rdd.RDD[Float] = MapPartitionsRDD[63] at map at <console>:29
+scala> orderItemsRevenue.take(10).foreach(println)
+299.98
+199.99
+250.0
+129.99
+49.98
+299.95
+150.0
+199.92
+299.98
+299.95
+
+
+scala> orderItemsRevenue.reduce
+                                def reduce(f: (T, T) => T): T
+
+all T should be same data type here. in this example all should be float.
+
+scala> orderItemsRevenue.reduce((total,revenue)=> total+revenue)
+res89: Float = 3.4326256E7
+
+// the value showing in exponential form here.
+
+#Find Max amount of revenue generated (highest revenue number in Dataset)? 
+
+scala> val orderMaxRevenue=orderItemsRevenue.reduce((max,revenue)=>{
+if (max > revenue) max else revenue
+})
+
+orderMaxRevenue: Float = 1999.99
+
+
+scala> val orderMinRevenue =orderItemsRevenue.reduce((min,revenue)=>{
+if (min < revenue) min else revenue
+})
+
+orderMinRevenue: Float = 9.99
+
+
+/**************************73. Aggregations - using actions (reduce and countByKey) ************************* End********************/
+
+
+/**************************74. Aggregations - understanding combiner*************Start***********************/
+
+Role of Combiner
+The concept of the combiner is relevant in understanding APIs used for aggregations
+
+Computing intermediate values and then using intermediate values to compute final values is called combiner
+Aggregations such as sum, min, max, average etc can perform better-using combiner
+
+
+
+1)when you use groupByKey :
+
+(1(key), (1 to 1000)(value)) , if we want to sum (1 to 1000) => 1+2+3+...1000  (single threaded)
+
+2) when you use reduceByKey / aggregateByKey:
+
+(1(key), (1 to 1000)(value)) , if we do sum (1 to 1000) =>  ( sum(1 to 250) sum(251,500) sum(501,750) sum(751,1000) ) (multithreaded ,uses more resources) better performance .. by using divide and conquer
+
+/**************************74. Aggregations - understanding combiner*************End***********************/
+
+
+/**************************75. Aggregations using groupByKey - least preferred API for aggregations **********Start *************/
+
+
+scala> val orderItems= sc.textFile("/public/retail_db/order_items")
+scala> orderItems.take(10).foreach(println)
+
+1,1,957,1,299.98,299.98
+2,2,1073,1,199.99,199.99
+3,2,502,5,250.0,50.0
+4,2,403,1,129.99,129.99
+5,4,897,2,49.98,24.99
+6,4,365,5,299.95,59.99
+7,4,502,3,150.0,50.0
+8,4,1014,4,199.92,49.98
+9,5,957,1,299.98,299.98
+10,5,365,5,299.95,59.99
+
+#PROBLEM STATEMENT : 
+1) Get total revenue per order_id
+2)Get data in descending order order by order_item_subtotal for each order_id
+
+in both cases we can use order_id as key.
+
+And we need KV pairs in order to use group by key.
+
+
+scala> val orderItemsMap=orderItems.map(o=>(o.split(",")(1).toInt,o.split(",")(4).toFloat))
+orderItemsMap: org.apache.spark.rdd.RDD[(Int, Float)] = MapPartitionsRDD[8] at map at <console>:29
+
+orderItemsMap.take(10).foreach(println)
+
+(1,299.98)
+(2,199.99)
+(2,250.0)
+(2,129.99)
+(4,49.98)
+(4,299.95)
+(4,150.0)
+(4,199.92)
+(5,299.98)
+(5,299.95)
+
+
+so groupByKey will convert above output as , (2,[199.99,250.0,129.99])  i.e for orderId =2 which is key all the respective items are grouped.
+
+
+scala> val orderItemsGBK=orderItemsMap.groupByKey
+orderItemsGBK: org.apache.spark.rdd.RDD[(Int, Iterable[Float])] = ShuffledRDD[10] at groupByKey at <console>:31
+
+scala> orderItemsGBK.take(10).foreach(println)
+(41234,CompactBuffer(109.94))
+(65722,CompactBuffer(119.98, 400.0, 399.98, 199.95, 199.98))
+(28730,CompactBuffer(299.95, 50.0))
+(68522,CompactBuffer(329.99))
+(23776,CompactBuffer(199.99, 129.99))
+(32676,CompactBuffer(59.99, 159.96, 299.97, 199.99))
+(53926,CompactBuffer(119.98, 99.99))
+(4926,CompactBuffer(199.92, 199.99, 239.96, 299.98))
+(38926,CompactBuffer(499.95, 250.0, 299.95))
+(29270,CompactBuffer(299.95, 119.98, 399.98, 159.96, 399.98))
+
+
+
+CompactBuffer is a collection type in scala.
+
+scala> orderItemsGBK
+res8: org.apache.spark.rdd.RDD[(Int, Iterable[Float])] = ShuffledRDD[10] at groupByKey at <console>:31
+
+
+1) Get total revenue per order_id
+ Solution : 
+ val totalRevenueforOrderid=orderItemsGBK.map(rec => (rec._1,rec._2.toList.sum))
+
+ totalRevenueforOrderid.soryByKey.take(10).foreach(println)
+
+scala> totalRevenueforOrderid.take(10).foreach(println)
+
+(41234,109.94)
+(65722,1319.8899)
+(28730,349.95)
+(68522,329.99)
+(23776,329.98)
+(32676,719.91003)
+(53926,219.97)
+(4926,939.85)
+(38926,1049.9)
+(29270,1379.8501)
+
+2)Get data in descending order order by order_item_subtotal for each order_id
+Solution:
+
+
+
+
+
+val orderItemsSortedByRevenu=orderItemsGBK.flatMap(rec=>{
+ val k=rec._2.toList.sortBy(o => -o) // sorted in in descending order
+ k.map(k=>(rec._1,k))   // creating KV pair as (order id , subtotal) 
+})    // as using flatmap , we get multiple KV pairs for each order id  in descending order of subtotal wise
+
+
+scala> orderItemsSortedByRevenu.take(10).foreach(println)
+(41234,109.94)
+(65722,400.0)
+(65722,399.98)
+(65722,199.98)
+(65722,199.95)
+(65722,119.98)
+(28730,299.95)
+(28730,50.0)
+(68522,329.99)
+(23776,199.99)
+
+//sortBy is customizing the sort with func as logic
+
+
+
+
+
+
+
+
+// Aggregations - groupByKey
+//1, (1 to 1000) - sum(1 to 1000) => 1 + 2+ 3+ .....1000
+//1, (1 to 1000) - sum(sum(1, 250), sum(251, 500), sum(501, 750), sum(751, 1000))
+
+
+val orderItems = sc.textFile("/public/retail_db/order_items")
+val orderItemsMap = orderItems.
+  map(oi => (oi.split(",")(1).toInt, oi.split(",")(4).toFloat))
+val orderItemsGBK = orderItemsMap.groupByKey
+//Get revenue per order_id
+orderItemsGBK.map(rec => (rec._1, rec._2.toList.sum)).take(10).foreach(println)
+//Get data in descending order by order_item_subtotal for each order_id
+val ordersSortedByRevenue = orderItemsGBK.
+  flatMap(rec => {
+    rec._2.toList.sortBy(o => -o).map(k => (rec._1, k))
+  })
+
+
+
+/**************************75. Aggregations using groupByKey - least preferred API for aggregations **********end*************/
+
+/**************************76. Aggregations using reduceByKey**********Start*************/
+
+
+
+
+
+Final notes:
+http://resources.itversity.com/courses/cca-175-spark-and-hadoop-developer-certification-scala/lessons/cca-transform-stage-and-store-spark-scala/topic/cca-aggregations-using-reducebykey-scala/
+
+// Aggregations - reduceByKey
+val orderItems = sc.textFile("/public/retail_db/order_items")
+val orderItemsMap = orderItems.
+  map(oi => (oi.split(",")(1).toInt, oi.split(",")(4).toFloat))
+scala> orderItemsMap.take(10).foreach(println)
+(1,299.98)
+(2,199.99)
+(2,250.0)
+(2,129.99)
+(4,49.98)
+(4,299.95)
+(4,150.0)
+(4,199.92)
+(5,299.98)
+(5,299.95)
+
+#PROBLEM STATEMENT 
+1) find revenue Per OrderId  (using reduceByKey)
+
+scala> 	val revenuePerOrderId= orderItemsMap.reduceByKey((x,y)=> x+y)
+
+scala> revenuePerOrderId.take(10).foreach(println)
+
+(41234,109.94)
+(65722,1319.8899)
+(28730,349.95)
+(68522,329.99)
+(23776,329.98)
+(32676,719.91003)
+(53926,219.97)
+(4926,939.85)
+(38926,1049.9)
+(29270,1379.8501)
+
+// To see first 10 results in ascending order
+scala> revenuePerOrderId.sortBy(o => o).take(10).foreach(println)
+
+(1,299.98)
+(2,579.98)
+(4,699.85004)
+(5,1129.8601)
+(7,579.92004)
+(8,729.84)
+(9,599.96)
+(10,651.92)
+(11,919.79004)
+(12,1299.8701)
+
+
+2) find min Revenue Per OrderId
+
+val minRevenuePerOrderId =orderItemsMap.reduceByKey((x,y)=> if (x<y) x else y)
+
+
+minRevenuePerOrderId.take(10).foreach(println)
+(41234,109.94)
+(65722,119.98)
+(28730,50.0)
+(68522,329.99)
+(23776,129.99)
+(32676,59.99)
+(53926,99.99)
+(4926,199.92)
+(38926,250.0)
+(29270,119.98)
+
+
+minRevenuePerOrderId.sortBy(o => o).take(10).foreach(println) // sorted with key in ascending order
+(1,299.98)
+(2,129.99)
+(4,49.98)
+(5,99.96)
+(7,79.95)
+(8,50.0)
+(9,199.98)
+(10,21.99)
+(11,49.98)
+(12,100.0)
+
+
+
+
+
+
+final notes from resources:
+
+val revenuePerOrderId = orderItemsMap.
+  reduceByKey((total, revenue) => total + revenue)
+
+val minRevenuePerOrderId = orderItemsMap.
+  reduceByKey((min, revenue) => if(min > revenue) revenue else min)
+
+
+/**************************76. Aggregations using reduceByKey**********end*************/
+
+
+
+/**************************77. Aggregations using aggregateByKey **********Start*************/
+
+
+#PROBLEM STATEMENT : 
+
+1) do the above two tasks in one time with aggregateByKey 
+i.e 
+revenuePerOrderId and maxRevenuePerOrderId
+
+
+val orderItems = sc.textFile("/public/retail_db/order_items")
+val orderItemsMap = orderItems.
+  map(oi => (oi.split(",")(1).toInt, oi.split(",")(4).toFloat))
+
+scala> orderItemsMap
+res2: org.apache.spark.rdd.RDD[(Int, Float)] = MapPartitionsRDD[2] at map at <console>:30
+
+scala> orderItemsMap.take(10).foreach(println)
+(1,299.98)  
+(2,199.99)
+(2,250.0)
+(2,129.99)
+(4,49.98)
+(4,299.95)
+(4,150.0)
+(4,199.92)
+(5,299.98)
+(5,299.95)
+
+
+//input KV pair - > //(order_id, order_item_subtotal)
+
+--> aggregateByKey()() --> aggregateByKey((intiative values))() --> aggregateByKey((0.0f,0.0f))() -->
+
+-->  aggregateByKey((0.0f,0.0f))( logic) ......
+
+val revenueAndMaxPerProductId =orderItemsMap.
+aggregateByKey((0.0f,0.0f))(
+(inter,subtotal)
+)
+val revenueAndMaxPerProductId = orderItemsMap.
+  aggregateByKey((0.0f, 0.0f))(
+    (a,b) =>(a._1+b , if(a._2 > b) a._2 else b),      
+    (c,a) => (c._2+a._2, if(c._2> a._2) c._2 else a._2)
+  )
+revenueAndMaxPerProductId: org.apache.spark.rdd.RDD[(Int, (Float, Float))] = ShuffledRDD[3] at aggregateByKey at <console>:32
+
+revenueAndMaxPerProductId.sortByKey().take(10).foreach(println)
+(1,(299.98,299.98))
+(2,(579.98,250.0))
+(4,(699.85004,299.95))
+(5,(1129.8601,299.98))
+(7,(579.92004,299.98))
+(8,(729.84,299.95))
+(9,(599.96,199.99))
+(10,(651.92,199.99))
+(11,(919.79004,399.96))
+(12,(1299.8701,499.95))
+
+
+
+    (inter, subtotal) => (inter._1 + subtotal, if(subtotal > inter._2) subtotal else inter._2),
+    (total, inter) => (total._1 + inter._1, if(total._2 > inter._2) total._2 else inter._2)
+
+
+revenueAndMaxPerProductId.sortByKey().take(10).foreach(println)
+(1,(299.98,299.98))
+(2,(579.98,250.0))
+(4,(699.85004,299.95))
+(5,(1129.8601,299.98))
+(7,(579.92004,299.98))
+(8,(729.84,299.95))
+(9,(599.96,199.99))
+(10,(651.92,199.99))
+(11,(919.79004,399.96))
+(12,(1299.8701,499.95))
+
+
+
+Summry :
+Input(order_id, order_item_subtotal)			output(order_id, (order_revenue, max_order_item_subtotal))
+
+(1,299.98)    										(1,(299.98,299.98))  
+(2,199.99)    										(2,(579.98,250.0))
+(2,250.0)     										(4,(699.85004,299.95))
+(2,129.99)    										(5,(1129.8601,299.98))
+(4,49.98)     										(7,(579.92004,299.98))
+(4,299.95)    										(8,(729.84,299.95))
+(4,150.0)     										(9,(599.96,199.99))
+(4,199.92)    										(10,(651.92,199.99))
+(5,299.98)    										(11,(919.79004,399.96))
+(5,299.95)    										(12,(1299.8701,499.95))
+
+
+val revenueAndMinPerProductId = orderItemsMap.
+  aggregateByKey((0.0f, Float.MaxValue))(
+    (a,b) =>(a._1+b , if(a._2 < b) a._2 else b),(c,a) => (c._2+a._2, if(c._2 < a._2) c._2 else a._2)
+  )
+/*
+a = temporary variable of type tuple
+b = type float (pased with default value supplied as second argument in aggregateByKey(  ,*here*))
+c =type tuple
+*/
+revenueAndMinPerProductId.sortByKey().take(10).foreach(println)
+
+(1,(299.98,299.98))
+(2,(579.98,129.99))
+(4,(699.85004,49.98))
+(5,(1129.8601,99.96))
+(7,(579.92004,79.95))
+(8,(729.84,50.0))
+(9,(599.96,199.98))
+(10,(651.92,21.99))
+(11,(919.79004,49.98))
+(12,(1299.8701,100.0))
+
+
+sc.setLog
+Final notes from resources:
+
+// Aggregations - aggregateByKey
+val orderItems = sc.textFile("/public/retail_db/order_items")
+val orderItemsMap = orderItems.
+  map(oi => (oi.split(",")(1).toInt, oi.split(",")(4).toFloat))
+
+//(order_id, order_item_subtotal)
+val revenueAndMaxPerProductId = orderItemsMap.
+  aggregateByKey((0.0f, 0.0f))(
+    (inter, subtotal) => (inter._1 + subtotal, if(subtotal > inter._2) subtotal else inter._2),
+    (total, inter) => (total._1 + inter._1, if(total._2 > inter._2) total._2 else inter._2)
+  )
+//(order_id, (order_revenue, max_order_item_subtotal))
+ 
+  output format :
+
+//(order_id, (order_revenue, max_order_item_subtotal))
+
+
+
+/**************************77. Aggregations using aggregateByKey **********end*************/
+
+/**************************78. Sorting data using sortByKey **********start*************/
+scala> val products = sc.textFile("/public/retail_db/products")
+
+scala> products.take(10).foreach(println)
+
+
+1,2,Quest Q64 10 FT. x 10 FT. Slant Leg Instant U,,59.98,http://images.acmesports.sports/Quest+Q64+10+FT.+x+10+FT.+Slant+Leg+Instant+Up+Canopy
+2,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat
+3,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat
+4,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat
+5,2,Riddell Youth Revolution Speed Custom Footbal,,199.99,http://images.acmesports.sports/Riddell+Youth+Revolution+Speed+Custom+Football+Helmet
+6,2,Jordan Men's VI Retro TD Football Cleat,,134.99,http://images.acmesports.sports/Jordan+Men%27s+VI+Retro+TD+Football+Cleat
+7,2,Schutt Youth Recruit Hybrid Custom Football H,,99.99,http://images.acmesports.sports/Schutt+Youth+Recruit+Hybrid+Custom+Football+Helmet+2014
+8,2,Nike Men's Vapor Carbon Elite TD Football Cle,,129.99,http://images.acmesports.sports/Nike+Men%27s+Vapor+Carbon+Elite+TD+Football+Cleat
+9,2,Nike Adult Vapor Jet 3.0 Receiver Gloves,,50.0,http://images.acmesports.sports/Nike+Adult+Vapor+Jet+3.0+Receiver+Gloves
+10,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat
+
+
+
+scala>  val productsMap = products.map(prd => (prd.split(",")(1).toInt,prd)) //CategoryID is key , record is value
+productsMap: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[3] at map at <console>:29
+
+val productsSortedByCategoryID=productsMap.sortByKey() //sorted by default in ascending order
+
+
+productsSortedByCategoryID.take(10).foreach(println) 
+
+(2,1,2,Quest Q64 10 FT. x 10 FT. Slant Leg Instant U,,59.98,http://images.acmesports.sports/Quest+Q64+10+FT.+x+10+FT.+Slant+Leg+Instant+Up+Canopy)
+(2,2,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat)
+(2,3,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat)
+(2,4,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat)
+(2,5,2,Riddell Youth Revolution Speed Custom Footbal,,199.99,http://images.acmesports.sports/Riddell+Youth+Revolution+Speed+Custom+Football+Helmet)
+(2,6,2,Jordan Men's VI Retro TD Football Cleat,,134.99,http://images.acmesports.sports/Jordan+Men%27s+VI+Retro+TD+Football+Cleat)
+(2,7,2,Schutt Youth Recruit Hybrid Custom Football H,,99.99,http://images.acmesports.sports/Schutt+Youth+Recruit+Hybrid+Custom+Football+Helmet+2014)
+(2,8,2,Nike Men's Vapor Carbon Elite TD Football Cle,,129.99,http://images.acmesports.sports/Nike+Men%27s+Vapor+Carbon+Elite+TD+Football+Cleat)
+(2,9,2,Nike Adult Vapor Jet 3.0 Receiver Gloves,,50.0,http://images.acmesports.sports/Nike+Adult+Vapor+Jet+3.0+Receiver+Gloves)
+(2,10,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat)
+
+val productsSortedByCategoryID=productsMap.sortByKey(false) // sorting in descending order by passing false
+
+productsSortedByCategoryID.take(10).foreach(println) 
+
+(59,1322,59,Nike Men's Cleveland Browns 'Money Manziel' T,,30.0,http://images.acmesports.sports/Nike+Men%27s+Cleveland+Browns+%27Money+Manziel%27+T-Shirt)
+(59,1323,59,"Nike Men's Home Game Jersey Cleveland Browns ",,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Cleveland+Browns+Johnny+Manziel...)
+(59,1324,59,Nike Men's Cleveland Browns Johnny Manziel 'M,,30.0,http://images.acmesports.sports/Nike+Men%27s+Cleveland+Browns+Johnny+Manziel+%27Money%27+T-Shirt)
+(59,1325,59,Nike Johnny Football Camo Graphic T-Shirt,,30.0,http://images.acmesports.sports/Nike+Johnny+Football+Camo+Graphic+T-Shirt)
+(59,1326,59,"Nike Youth Home Game Jersey Cleveland Browns ",,70.0,http://images.acmesports.sports/Nike+Youth+Home+Game+Jersey+Cleveland+Browns+Johnny+Manziel...)
+(59,1327,59,Nike Johnny Football Camo Jersey T-Shirt,,30.0,http://images.acmesports.sports/Nike+Johnny+Football+Camo+Jersey+T-Shirt)
+(59,1328,59,Nike Men's Cleveland Browns Johnny Manziel #2,,32.0,http://images.acmesports.sports/Nike+Men%27s+Cleveland+Browns+Johnny+Manziel+%232+Brown+T-Shirt)
+(59,1329,59,Nike Men's Cleveland Browns Johnny Football O,,28.0,http://images.acmesports.sports/Nike+Men%27s+Cleveland+Browns+Johnny+Football+Orange+T-Shirt)
+(59,1330,59,Nike Men's Home Game Jersey Denver Broncos Pe,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Denver+Broncos+Peyton+Manning...)
+(59,1331,59,Nike Men's Home Game Jersey Buffalo Bills Sam,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Buffalo+Bills+Sammy+Watkins+%2314)
+
+
+productsSortedByCategoryID.take(10).foreach(println) 
+
+val productsMap = products.map(prd => (prd.split(",")(1).toInt,prd))
+
+
+#PROBLEM STATEMENT : 
+1) sort the product by product price in descending order :  (in real time we generallly use composite keys i.e combination of two or more keys to use as sort keys)
+here in this below statement, we use (product_id, product_price) as composite key
+
+val productsMap = products.map(prd => ((prd.split(",")(1).toInt,prd.split(",")(4).toFloat),prd))
+
+val productsSortedByCategoryIDAndPrice =productsMap.sortByKey(false)
+
+Caused by: java.lang.NumberFormatException: empty String
+
+Adding filter to discard  the unwanted above record with causing the NumberFormatException:
+
+val productsMap = products.filter(prd=> (prd.split(",")(4)!= "")).
+map(prd => ((prd.split(",")(1).toInt,prd.split(",")(4).toFloat),prd))
+
+scala> productsMap.count
+res5: Long = 1345
+scala> productsMap.count
+res6: Long = 1344
+
+as we can see above count ,We have discarded that record
+
+Now > //by default its ascending order with no parameters supplied to sortByKey.
+
+
+val productsSortedByCategoryIDAndPriceASC =productsMap.sortByKey() //by default its ascending order with no parameters supplied to sortByKey.
+scala> productsSortedByCategoryIDAndPriceASC.take(10).foreach(println)
+((2,29.97),18,2,Reebok Men's Full Zip Training Jacket,,29.97,http://images.acmesports.sports/Reebok+Men%27s+Full+Zip+Training+Jacket)
+((2,29.99),22,2,Kijaro Dual Lock Chair,,29.99,http://images.acmesports.sports/Kijaro+Dual+Lock+Chair)
+((2,50.0),9,2,Nike Adult Vapor Jet 3.0 Receiver Gloves,,50.0,http://images.acmesports.sports/Nike+Adult+Vapor+Jet+3.0+Receiver+Gloves)
+((2,54.99),21,2,Under Armour Kids' Highlight RM Football Clea,,54.99,http://images.acmesports.sports/Under+Armour+Kids%27+Highlight+RM+Football+Cleat)
+((2,59.98),1,2,Quest Q64 10 FT. x 10 FT. Slant Leg Instant U,,59.98,http://images.acmesports.sports/Quest+Q64+10+FT.+x+10+FT.+Slant+Leg+Instant+Up+Canopy)
+((2,59.99),15,2,Under Armour Kids' Highlight RM Alter Ego Sup,,59.99,http://images.acmesports.sports/Under+Armour+Kids%27+Highlight+RM+Alter+Ego+Superman+Football...)
+((2,79.99),24,2,Elevation Training Mask 2.0,,79.99,http://images.acmesports.sports/Elevation+Training+Mask+2.0)
+((2,89.99),3,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat)
+((2,89.99),4,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat)
+((2,89.99),13,2,Under Armour Men's Renegade D Mid Football Cl,,89.99,http://images.acmesports.sports/Under+Armour+Men%27s+Renegade+D+Mid+Football+Cleat)
+
+
+val productsSortedByCategoryIDAndPrice =productsMap.sortByKey(false) //descending order 
+
+scala> productsSortedByCategoryIDAndPrice.take(10).foreach(println)
+
+((59,100.0),1323,59,"Nike Men's Home Game Jersey Cleveland Browns ",,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Cleveland+Browns+Johnny+Manziel...)
+((59,100.0),1330,59,Nike Men's Home Game Jersey Denver Broncos Pe,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Denver+Broncos+Peyton+Manning...)
+((59,100.0),1331,59,Nike Men's Home Game Jersey Buffalo Bills Sam,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Buffalo+Bills+Sammy+Watkins+%2314)
+((59,100.0),1332,59,Nike Men's Home Game Jersey San Francisco 49e,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+San+Francisco+49ers+Colin...)
+((59,100.0),1333,59,Nike Men's Home Game Jersey Pittsburgh Steele,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Pittsburgh+Steelers+Ryan+Shazier...)
+((59,100.0),1334,59,Nike Men's Home Game Jersey New Orleans Saint,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+New+Orleans+Saints+Brandin+Cooks...)
+((59,100.0),1335,59,Nike Men's Andrew Luck Jersey - Home Game Ind,,100.0,http://images.acmesports.sports/Nike+Men%27s+Andrew+Luck+Jersey+-+Home+Game+Indianapolis+Colts)
+((59,100.0),1336,59,Nike Men's Home Game Jersey New York Giants O,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+New+York+Giants+Odell+Beckham...)
+((59,100.0),1337,59,Nike Men's Home Game Jersey Carolina Panthers,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Carolina+Panthers+Kelvin...)
+((59,100.0),1338,59,Nike Men's Home Game Jersey Chicago Bears Jar,,100.0,http://images.acmesports.sports/Nike+Men%27s+Home+Game+Jersey+Chicago+Bears+Jared+Allen+%2369)
+
+
+
+Here both Product_id, and Product_price are in descending order. which is in result not giving correct output.
+we need only product_price in descending but product_id in ascending.
+
+
+val productsSortedByCategoryIDASCAndPriceDESC =productsMap.sortByKey(false) 
+
+scala> productsSortedByCategoryIDAndPrice.take(10).foreach(println)
+
+
+val productsMap = products.filter(prd=> (prd.split(",")(4)!= "")).
+map(prd => ((prd.split(",")(1).toInt, -prd.split(",")(4).toFloat),prd)) // negating the price value to get  descending order.
+
+val productsSortedByCategoryIDASCAndPriceDESC =productsMap.sortByKey() 
+
+productsSortedByCategoryIDASCAndPriceDESC.take(10).foreach(println)
+((2,-299.99),16,2,Riddell Youth 360 Custom Football Helmet,,299.99,http://images.acmesports.sports/Riddell+Youth+360+Custom+Football+Helmet)
+((2,-209.99),11,2,Fitness Gear 300 lb Olympic Weight Set,,209.99,http://images.acmesports.sports/Fitness+Gear+300+lb+Olympic+Weight+Set)
+((2,-199.99),5,2,Riddell Youth Revolution Speed Custom Footbal,,199.99,http://images.acmesports.sports/Riddell+Youth+Revolution+Speed+Custom+Football+Helmet)
+((2,-199.99),14,2,Quik Shade Summit SX170 10 FT. x 10 FT. Canop,,199.99,http://images.acmesports.sports/Quik+Shade+Summit+SX170+10+FT.+x+10+FT.+Canopy)
+((2,-139.99),12,2,Under Armour Men's Highlight MC Alter Ego Fla,,139.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Alter+Ego+Flash+Football...)
+((2,-139.99),23,2,Under Armour Men's Highlight MC Alter Ego Hul,,139.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Alter+Ego+Hulk+Football...)
+((2,-134.99),6,2,Jordan Men's VI Retro TD Football Cleat,,134.99,http://images.acmesports.sports/Jordan+Men%27s+VI+Retro+TD+Football+Cleat)
+((2,-129.99),2,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat)
+((2,-129.99),8,2,Nike Men's Vapor Carbon Elite TD Football Cle,,129.99,http://images.acmesports.sports/Nike+Men%27s+Vapor+Carbon+Elite+TD+Football+Cleat)
+((2,-129.99),10,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat)
+
+
+Now get the reocrds only by  ignore the keys
+
+val productsSortedByCategoryIDASCAndPriceDESC_records =productsSortedByCategoryIDASCAndPriceDESC.map(p => p._2)
+
+productsSortedByCategoryIDASCAndPriceDESC_records.take(10).foreach(println)
+
+16,2,Riddell Youth 360 Custom Football Helmet,,299.99,http://images.acmesports.sports/Riddell+Youth+360+Custom+Football+Helmet
+11,2,Fitness Gear 300 lb Olympic Weight Set,,209.99,http://images.acmesports.sports/Fitness+Gear+300+lb+Olympic+Weight+Set
+5,2,Riddell Youth Revolution Speed Custom Footbal,,199.99,http://images.acmesports.sports/Riddell+Youth+Revolution+Speed+Custom+Football+Helmet
+14,2,Quik Shade Summit SX170 10 FT. x 10 FT. Canop,,199.99,http://images.acmesports.sports/Quik+Shade+Summit+SX170+10+FT.+x+10+FT.+Canopy
+12,2,Under Armour Men's Highlight MC Alter Ego Fla,,139.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Alter+Ego+Flash+Football...
+23,2,Under Armour Men's Highlight MC Alter Ego Hul,,139.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Alter+Ego+Hulk+Football...
+6,2,Jordan Men's VI Retro TD Football Cleat,,134.99,http://images.acmesports.sports/Jordan+Men%27s+VI+Retro+TD+Football+Cleat
+2,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat
+8,2,Nike Men's Vapor Carbon Elite TD Football Cle,,129.99,http://images.acmesports.sports/Nike+Men%27s+Vapor+Carbon+Elite+TD+Football+Cleat
+10,2,Under Armour Men's Highlight MC Football Clea,,129.99,http://images.acmesports.sports/Under+Armour+Men%27s+Highlight+MC+Football+Cleat
+
+
+http://resources.itversity.com/courses/cca-175-spark-and-hadoop-developer-certification-scala/lessons/cca-transform-stage-and-store-spark-scala/topic/cca-sorting-data-using-sortbykey-scala/
+
+final notes from resources:
+
+Data can be sorted using sortByKey
+Input RDD have to be paired RDD
+Data can be sorted in ascending or descending order
+By default, data will be sorted in natural ascending order of the key
+We can pass False to sortByKey function to sort in descending order
+
+
+val products = sc.textFile("/public/retail_db/products")
+val productsMap = products.
+  map(product => (product.split(",")(1).toInt, product))
+val productsSortedByCategoryId = productsMap.sortByKey(false)
+
+val productsMap = products.
+  filter(product => product.split(",")(4) != "").
+  map(product => ((product.split(",")(1).toInt, -product.split(",")(4).toFloat), product))
+
+val productsSortedByCategoryId = productsMap.sortByKey().map(rec => rec._2)
+
+
+/**************************78. Sorting data using sortByKey **********end*************/
+
+/****************************************************79. Global Ranking - using sortByKey with take and takeOrdered **********Start************************/
+#Global Ranking – sortByKey with take and takeOrdered
+
+
+#PROBLEM STATEMENT :
+1) get top 5 products by price in descending order :
+
+
+val products = sc.textFile("/public/retail_db/products")
+val productsMap = products.filter(product => product.split(",")(4)!="").map(product => (product.split(",")(4).toFloat, product))
+
+val productsSortedByPrice= productsMap.sortByKey(false).map(p => p._2)
+
+	productsSortedByPrice.take(10).foreach(println)
+
+208,10,SOLE E35 Elliptical,,1999.99,http://images.acmesports.sports/SOLE+E35+Elliptical
+66,4,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+199,10,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+496,22,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+1048,47,"Spalding Beast 60"" Glass Portable Basketball ",,1099.99,http://images.acmesports.sports/Spalding+Beast+60%22+Glass+Portable+Basketball+Hoop
+60,4,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+197,10,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+488,22,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+694,32,Callaway Women's Solaire Gems 20-Piece Comple,,999.99,http://images.acmesports.sports/Callaway+Women%27s+Solaire+Gems+20-Piece+Complete+Set+-...
+695,32,Callaway Women's Solaire Gems 20-Piece Comple,,999.99,http://images.acmesports.sports/Callaway+Women%27s+Solaire+Gems+20-Piece+Complete+Set+-...
+
+
+# but this approach works only if there are no duplicates.
+
+
+
+#there is another approach to the same 
+
+val products = sc.textFile("/public/retail_db/products")
+val productsSortedByPriceByTakeOrdered = products.filter(product => product.split(",")(4)!="")
+.takeOrdered(10)(Ordering[Float].reverse.on(prd => prd.split(",")(4).toFloat))
+.foreach(println)
+
+208,10,SOLE E35 Elliptical,,1999.99,http://images.acmesports.sports/SOLE+E35+Elliptical
+496,22,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+199,10,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+66,4,SOLE F85 Treadmill,,1799.99,http://images.acmesports.sports/SOLE+F85+Treadmill
+1048,47,"Spalding Beast 60"" Glass Portable Basketball ",,1099.99,http://images.acmesports.sports/Spalding+Beast+60%22+Glass+Portable+Basketball+Hoop
+60,4,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+695,32,Callaway Women's Solaire Gems 20-Piece Comple,,999.99,http://images.acmesports.sports/Callaway+Women%27s+Solaire+Gems+20-Piece+Complete+Set+-...
+197,10,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+694,32,Callaway Women's Solaire Gems 20-Piece Comple,,999.99,http://images.acmesports.sports/Callaway+Women%27s+Solaire+Gems+20-Piece+Complete+Set+-...
+488,22,SOLE E25 Elliptical,,999.99,http://images.acmesports.sports/SOLE+E25+Elliptical
+
+
+
+
+## You dont need to map again to get only record elements like we use in sortByKey approach
+
+
+
+Final notes from resources:
+
+Global Ranking – sortByKey with take and takeOrdered
+sortByKey is used to sort the data
+We can use take to get first n number of records after sorting the data
+However typical sortByKey and take does not work if there are more than n records that fall under top N
+takeOrdered will sort the data based on the key as per logic and then get first N records
+
+
+
+
+
+
+/**************************79. Global Ranking - using sortByKey with take and takeOrdered **********end*************/
+
+
+
+/**************************80. By Key Ranking - Converting (K, V) pairs into (K, Iterable[V]) using groupByKey **********Start*************/
+
+#PROBLEM STATEMENT:
+
+1) get the top n priced products within each product_category:
+
+// Ranking - Get top N priced products with in each product category
+val products = sc.textFile("/public/retail_db/products")
+
+scala>  val productsMap = products.filter(p => p.split(",")(4)!="").map(p=> (p.split(",")(1).toInt,p))
+productsMap: org.apache.spark.rdd.RDD[(Int, String)] = MapPartitionsRDD[64] at map at <console>:29
+
+scala> val productsGroupByKey = productsMap.groupByKey
+18/05/21 04:47:29 INFO FileInputFormat: Total input paths to process : 1
+productsGroupByKey: org.apache.spark.rdd.RDD[(Int, Iterable[String])] = ShuffledRDD[65] at groupByKey at <console>:31
+
+
+
+scala> productsMap.count
+res23: Long = 1344 // total no of records by excluding the record with "" by filter
+
+
+scala> productsGroupByKey.count
+res24: Long = 55 // total no of categories . each of these records are Iterable of type String
+ 
+
+
+// PREVIEW a record
+productsGroupByKey.first
+res28: (Int, Iterable[String]) = (34,CompactBuffer(741,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 742,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 748,34,Ogio City Turf Golf Shoes,,129.99,htt...
+scala>
+
+
+
+To be continued in next session..
+
+
+
+Final notes from resources :
+
+Let us get into details of By Key ranking
+
+Read data from HDFS
+Convert data into paired RDD using map
+Group data into key and array of values using groupByKey
+Apply flatMap and process the array of values to get data as per ranking requirements
+
+// Ranking - Get top N priced products with in each product category
+val products = sc.textFile("/public/retail_db/products")
+val productsMap = products.
+  filter(product => product.split(",")(4) != "").
+  map(product => (product.split(",")(1).toInt, product))
+val productsGroupByCategory = productsMap.groupByKey
+
+
+/**************************80. By Key Ranking - Converting (K, V) pairs into (K, Iterable[V]) using groupByKey **********end*************/
+
+/**************************81. Get topNPrices using Scala Collections AP **********start*************/
+
+val productsGroupByKey = productsMap.groupByKey
+
+Continuing from previous session(80) :
+
+
+productsGroupByKey.first
+res28: (Int, Iterable[String]) = (34,CompactBuffer(741,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 742,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 748,34,Ogio City Turf Golf Shoes,,129.99,htt...
+
+#We need only array "CompactBuffer"
+
+ val productsIterable= productsGroupByKey.first._2
+
+productsIterable: Iterable[String] = CompactBuffer(741,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 742,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes, 743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 748,34,Ogio City Turf Golf Shoes,,129.99,htt...
+
+
+# since its a scala collection we can use scala APIs to get top N prices :
+
+
+i) extract all the prices in record
+
+Scala> productsIterable.map(p =>p.split(",")(4).toFloat)
+res30: Iterable[Float] = List(59.99, 59.99, 169.99, 169.99, 149.99, 149.99, 149.99, 129.99, 129.99, 129.99, 99.99, 99.99, 99.99, 149.99, 149.99, 149.99, 99.99, 99.99, 139.99, 139.99, 139.99, 139.99, 34.99, 99.99)
+
+ii) remove all the duplicates first:
+
+scala> productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+res31: scala.collection.immutable.Set[Float] = Set(99.99, 169.99, 149.99, 59.99, 129.99, 34.99, 139.99)
+
+iii)  Since Set doesnt have sort api , convert it back to List
+
+val productPrices=productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+scala> val topNPrices  =productPrices.toList.sortBy(p => -p).take(5)
+topNPrices: List[Float] = List(169.99, 149.99, 139.99, 129.99, 99.99)
+
+
+
+# take Iterable and topN as input and returns the Iterable 
+def getTopNpricedProducts(productIterable: Iterable[String], topN: Int):Iterable[String]={val productPrices=productIterable.map(p =>p.split(",")(4).toFloat).toSet
+   val topNPrices  =productPrices.toList.sortBy(p => -p).take(topN)
+
+}
+
+
+To Be Continued .. in next session
+
+
+Final notes from resources :
+Scala APIs to get top N Prices
+
+
+val productsIterable = productsGroupByCategory.first._2
+val productPrices = productsIterable.map(p => p.split(",")(4).toFloat).toSet
+val topNPrices = productPrices.toList.sortBy(p => -p).take(5)
+
+
+def getTopNPricedProducts(productsIterable: Iterable[String], topN: Int): Iterable[String] = {
+ val productPrices = productsIterable.map(p => p.split(",")(4).toFloat).toSet
+ val topNPrices = productPrices.toList.sortBy(p => -p).take(topN)
+
+}
+
+/**************************81. Get topNPrices using Scala Collections AP **********end*************/
+
+/**************************82. Get topNPricedProducts using Scala Collections API**********Start*************/
+
+
+
+Contnuation from last session .. 
+
+
+iv) As we want only N priced products ,we need to know what is the lowest value in that collection for comparision.
+
+scala> val  minPriedProduct =topNPrices.min
+minPriedProduct: Float = 99.99
+
+Now the goal is to get the all products which are greater than equal to minPriedProduct value . ie 99.99
+
+v) sort the products before comparision in descending order so that you can read from top and ignore the products which are priced less than minPriedProduct value
+
+scala> val productPricesSorted = productsIterable.toList.sortBy(p =>  -p.split(",")(4).toFloat)
+
+productPricesSorted: List[String] = List(743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes, 745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes, 754,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes, 755,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes, 756,34,TRUE linkswear Lyt Dry Go...
+
+lets preview above one once :
+productPricesSorted.foreach(println)
+
+743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+754,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+755,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+756,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+759,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+760,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+761,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+762,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+748,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+749,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+750,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+751,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+752,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+753,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+757,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+758,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+764,34,Nike Lunar Mount Royal Golf Shoes,,99.99,http://images.acmesports.sports/Nike+Lunar+Mount+Royal+Golf+Shoes
+741,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes
+742,34,FootJoy GreenJoys Golf Shoes,,59.99,http://images.acmesports.sports/FootJoy+GreenJoys+Golf+Shoes
+763,34,PING Golf Shoe Bag,,34.99,http://images.acmesports.sports/PING+Golf+Shoe+Bag
+
+
+
+vi) now we have to compare minPriedProduct with above Iterable collection and filter out all less than minPriedProduct value products.
+for this we can use filter but due to performance reasons(not comparing to the all records which are already in sorted order) 
+we can use takeWhile function.
+note: takeWhile will stop the iteration once the condition is false.
+
+val topNPricedProducts_final= productPricesSorted.takeWhile(p => p.split(",")(4).toFloat >= minPriedProduct)
+
+
+topNPricedProducts_final.foreach(println)
+
+743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+754,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+755,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+756,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+759,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+760,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+761,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+762,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+748,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+749,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+750,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+751,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+752,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+753,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+757,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+758,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+764,34,Nike Lunar Mount Royal Golf Shoes,,99.99,http://images.acmesports.sports/Nike+Lunar+Mount+Royal+Golf+Shoes
+
+
+
+vii) now Embedd the above logic in a function :
+
+
+# take Iterable and topN as input and returns the Iterable 
+def getTopNpricedProducts(productsIterable: Iterable[String], topN: Int) : Iterable[String] = {
+
+   val productPrices=productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+   val topNPrices  =productPrices.toList.sortBy(p => -p).take(topN)
+   val  minPriedProduct =topNPrices.min
+   val productPricesSorted = productsIterable.toList.sortBy(p =>  -p.split(",")(4).toFloat)
+   val topNPricedProducts = productPricesSorted.takeWhile( p => p.split(",")(4).toFloat >= minPriedProduct)
+
+   topNPricedProducts
+}
+
+scala> def getTopNpricedProducts(productsIterable: Iterable[String], topN: Int) : Iterable[String] = {
+   
+       val productPrices=productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+       val topNPrices  =productPrices.toList.sortBy(p => -p).take(topN)
+       val  minPriedProduct =topNPrices.min
+       val productPricesSorted = productsIterable.toList.sortBy(p =>  -p.split(",")(4).toFloat)
+       val topNPricedProducts = productPricesSorted.takeWhile( p => p.split(",")(4).toFloat >= minPriedProduct)
+   
+       topNPricedProducts
+    }
+getTopNpricedProducts: (productsIterable: Iterable[String], topN: Int)Iterable[String]
+
+scala> getTopNpricedProducts(productsIterable,5).foreach(println)
+743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+754,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+755,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+756,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+759,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+760,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+761,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+762,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+748,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+749,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+750,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+751,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+752,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+753,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+757,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+758,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+764,34,Nike Lunar Mount Royal Golf Shoes,,99.99,http://images.acmesports.sports/Nike+Lunar+Mount+Royal+Golf+Shoes
+
+# function to directly print :
+
+def getTopNpricedProducts(productsIterable: Iterable[String], topN: Int) : Unit  = {
+ val productPrices=productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+ val topNPrices  =productPrices.toList.sortBy(p => -p).take(topN)
+ val  minPriedProduct =topNPrices.min
+ val productPricesSorted = productsIterable.toList.sortBy(p =>  -p.split(",")(4).toFloat)
+ val topNPricedProducts = productPricesSorted.takeWhile( p => p.split(",")(4).toFloat >= minPriedProduct)
+
+   topNPricedProducts.foreach(println)
+}
+
+scala> getTopNpricedProducts(productsIterable,5)
+743,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+744,34,Ogio Race Golf Shoes,,169.99,http://images.acmesports.sports/Ogio+Race+Golf+Shoes
+745,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+746,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+747,34,Ogio City Spiked Golf Shoes,,149.99,http://images.acmesports.sports/Ogio+City+Spiked+Golf+Shoes
+754,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+755,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+756,34,TRUE linkswear Lyt Dry Golf Shoes,,149.99,http://images.acmesports.sports/TRUE+linkswear+Lyt+Dry+Golf+Shoes
+759,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+760,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+761,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+762,34,Nike Lunarwaverly Golf Shoes,,139.99,http://images.acmesports.sports/Nike+Lunarwaverly+Golf+Shoes
+748,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+749,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+750,34,Ogio City Turf Golf Shoes,,129.99,http://images.acmesports.sports/Ogio+City+Turf+Golf+Shoes
+751,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+752,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+753,34,Ogio Sport Golf Shoes,,99.99,http://images.acmesports.sports/Ogio+Sport+Golf+Shoes
+757,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+758,34,TRUE linkswear Vegas Golf Shoes,,99.99,http://images.acmesports.sports/TRUE+linkswear+Vegas+Golf+Shoes
+764,34,Nike Lunar Mount Royal Golf Shoes,,99.99,http://images.acmesports.sports/Nike+Lunar+Mount+Royal+Golf+Shoes
+
+# function to return Iterable:
+def getTopNpricedProducts(productsIterable: Iterable[String], topN: Int) : Iterable[String]   = {
+ val productPrices=productsIterable.map(p =>p.split(",")(4).toFloat).toSet
+ val topNPrices  =productPrices.toList.sortBy(p => -p).take(topN)
+ val  minPriedProduct =topNPrices.min
+ val productPricesSorted = productsIterable.toList.sortBy(p =>  -p.split(",")(4).toFloat)
+ val topNPricedProducts = productPricesSorted.takeWhile( p => p.split(",")(4).toFloat >= minPriedProduct)
+
+   topNPricedProducts
+}
+
+
+
+
+
+
+
+
+
+
+
+Final notes from resources :
+Scala APIs to get top N Prices
+
+http://resources.itversity.com/courses/cca-175-spark-and-hadoop-developer-certification-scala/lessons/cca-transform-stage-and-store-spark-scala/topic/cca-get-topnpricedproducts-using-scala-collections-api-scala/
+
+// Function to get top n priced products using Scala collections API
+
+val products = sc.textFile("/public/retail_db/products")
+val productsMap = products.
+  filter(product => product.split(",")(4) != "").
+  map(product => (product.split(",")(1).toInt, product))
+val productsGroupByCategory = productsMap.groupByKey
+
+def getTopNPricedProducts(productsIterable: Iterable[String], topN: Int): Iterable[String] = {
+  val productPrices = productsIterable.map(p => p.split(",")(4).toFloat).toSet
+  val topNPrices = productPrices.toList.sortBy(p => -p).take(topN)
+
+  val productsSorted = productsIterable.toList.sortBy(product => -product.split(",")(4).toFloat)
+  val minOfTopNPrices = topNPrices.min
+
+  val topNPricedProducts = productsSorted.takeWhile(product => product.split(",")(4).toFloat >= minOfTopNPrices)
+
+  topNPricedProducts
+}
+
+val productsIterable = productsGroupByCategory.first._2
+getTopNPricedProducts(productsIterable, 3).foreach(println)
+
+
+/**************************82. Get topNPricedProducts using Scala Collections API**********end*************/
+
+
+
+/**************************83. Get top n products by category using groupByKey, flatMap and Scala function **********Start*************/
+
+# in above exercise , we have got the top n priced products only for one Iterable.
+ i.e for productsIterable.
+
+val productsIterable = productsGroupByCategory.first._2
+
+Now we need to to apply that one for entire productsGroupByCategory's  ._2 iterables
+
+
+val top3PricedProductsPerCategory = productsGroupByCategory.flatMap(rec =>(getTopNPricedProducts(rec._2,3)))
+
+/*
+scala> productsGroupByCategory.flatMap(rec => rec._2).count
+res17: Long = 1344
+*/
+
+scala> top3PricedProductsPerCategory.collect.foreach(println)   //used collect here because top3PricedProductsPerCategory is a RDD
+
+
+productsGroupByCategory.flatMap(rec => rec._2).collect.foreach(println)
+
+
+
+Final notes from resources :
+
+
+Get top N priced products per category
+Here are the steps performed
+
+Read data from HDFS
+Convert data into paired RDD using map
+Group data into key and array of values using groupByKey
+Define a function to get top N priced products for a given category
+Invoke function as part of flatMap so that we can get top N priced products for all categories
+// Ranking - Get top N priced products with in each product category
+
+val products = sc.textFile("/public/retail_db/products")
+val productsMap = products.
+  filter(product => product.split(",")(4) != "").
+  map(product => (product.split(",")(1).toInt, product))
+val productsGroupByCategory = productsMap.groupByKey
+
+def getTopNPricedProducts(productsIterable: Iterable[String], topN: Int): Iterable[String] = {
+  val productPrices = productsIterable.map(p => p.split(",")(4).toFloat).toSet
+  val topNPrices = productPrices.toList.sortBy(p => -p).take(topN)
+
+  val productsSorted = productsIterable.toList.sortBy(product => -product.split(",")(4).toFloat)
+  val minOfTopNPrices = topNPrices.min
+
+  val topNPricedProducts = productsSorted.takeWhile(product => product.split(",")(4).toFloat >= minOfTopNPrices)
+
+  topNPricedProducts
+}
+
+val top3PricedProductsPerCategory = productsGroupByCategory.flatMap(rec => getTopNPricedProducts(rec._2, 3))
+
+
+
+
+/**************************83. Get top n products by category using groupByKey, flatMap and Scala function **********end*************/
+
+
+/**************************84. Set Operations - union, intersect, distinct as well as minus **********Start*************/
+
+
+#PROBLEM STATEMENT :
+
+1) get all the customers who placed orders in 2013 august and september
+2) get all unique customers who placed orders in 2013 august and september
+
+val orders = sc.textFile("/public/retail_db/orders")
+
+scala> val customer201308 =  orders.filter(order => order.split(",")(1).contains("2013-08")).map(order =>(order.split(",")(2).toInt))
+customer201308: org.apache.spark.rdd.RDD[Int] = MapPartitionsRDD[13] at map at <console>:29
+
+customer201308.take(10).foreach(println)
+11607
+5105
+7802
+553
+1604
+1695
+7018
+2059
+3844
+11672
+
+scala> customer201308.count
+res21: Long = 5680
+
+
+scala> val customer201309 =  orders.filter(order => order.split(",")(1).contains("2013-09")).map(order =>(order.split(",")(2).toInt))
+customer201309: org.apache.spark.rdd.RDD[Int] = MapPartitionsRDD[15] at map at <console>:29
+
+
+customer201309.take(10).foreach(println)
+437
+9126
+11516
+8095
+7209
+1515
+9236
+10133
+2114
+5068
+
+scala> customer201309.count
+res22: Long = 5841
+
+Union : ==> 
+
+val customer2013_08_and_2013_09 = customer201308.union(customer201309)
+res23: Long = 11521
+
+val customer2013_08_and_2013_09_unique = customer201308.union(customer201309).distinct
+scala> customer2013_08_and_2013_09.count
+
+scala> customer2013_08_and_2013_09_unique.count
+res24: Long = 7516
+
+
+Intersection : ==> 
+
+
+val customer2013_08_and_2013_09_both = customer201308.intersection(customer201309)  // no duplicates in intersection
+
+scala> customer2013_08_and_2013_09_both.count
+res25: Long = 1689
+
+
+
+Minus : ==> 
+val customer201308_minus_customer201309 = customer201308.leftOuterJoin(customer201309)
+
+<console>:31: error: value leftOuterJoin is not a member of org.apache.spark.rdd.RDD[Int]
+         val customer201308_minus_customer201309 = customer201308.leftOuterJoin(customer201309)
+                                                                  ^
+Error because joins require KV pair as input .
+so modifying the query as below,
+
+val customer201308_minus_customer201309 = customer201308.map(c=> (c,1)).leftOuterJoin(customer201309.map( c=>(c,1)))
+customer201308_minus_customer201309: org.apache.spark.rdd.RDD[(Int, (Int, Option[Int]))] = MapPartitionsRDD[42] at leftOuterJoin at <console>:33
+
+
+customer201308_minus_customer201309.take(10).foreach(println)
+(4904,(1,None))
+(7942,(1,Some(1)))
+(4926,(1,Some(1)))
+(4926,(1,Some(1)))
+(10126,(1,Some(1)))
+(1894,(1,None))
+(7136,(1,Some(1)))
+(8516,(1,None))
+(140,(1,None))
+(956,(1,None))
+
+# here Some(1) means there is 1 order placed in even in sepetember by the respective customer
+# None is no order placed by customer in sepetember 
+
+-> so remove all the some(n) records to get minus records .
+
+val customer201308_minus_customer201309 = customer201308.map(c=> (c,1)).leftOuterJoin(customer201309.map( c=>(c,1))).filter(rec => rec._2._2 == None).distinct
+
+customer201308_minus_customer201309.take(10).foreach(println)
+
+7678,(1,None))
+(10627,(1,None))
+(10115,(1,None))
+(4932,(1,None))
+(9205,(1,None))
+(9079,(1,None))
+(6025,(1,None))
+(4702,(1,None))
+(10595,(1,None))
+(700,(1,None))
+
+
+-> We dont need 1,None part  as we only need customer_ids.
+
+val customer201308_minus_customer201309 = customer201308
+.map(c=> (c,1)).leftOuterJoin(customer201309.map( c=>(c,1)))
+.filter(rec => rec._2._2 == None)
+.distinct
+.map(a => a._1)
+
+customer201308_minus_customer201309.take(10).foreach(println)
+
+7678
+10627
+10115
+4932
+9205
+9079
+6025
+4702
+10595
+700
+
+scala> customer201308_minus_customer201309.count
+res33: Long = 2866
+
+
+Final notes from resources :
+
+
+Let us get into set operations using Spark APIs. Spark support
+
+union
+intersection
+distinct
+minus – subtract
+When the union is performed, data will not be unique
+Typically we have to use distinct after union to eliminate duplicates
+
+
+
+// Set operations
+
+val orders = sc.textFile("/public/retail_db/orders")
+val customers_201308 = orders.
+  filter(order => order.split(",")(1).contains("2013-08")).
+  map(order => order.split(",")(2).toInt)
+
+val customers_201309 = orders.
+  filter(order => order.split(",")(1).contains("2013-09")).
+  map(order => order.split(",")(2).toInt)
+
+// Get all the customers who placed orders in 2013 August and 2013 September
+val customers_201308_and_201309 = customers_201308.intersection(customers_201309)
+
+// Get all unique customers who placed orders in 2013 August or 2013 September
+val customers_201308_union_201309 = customers_201308.union(customers_201309).distinct
+
+// Get all customers who placed orders in 2013 August but not in 2013 September
+val customer_201308_minus_201309 = customers_201308.map(c => (c, 1)).
+  leftOuterJoin(customers_201309.map(c => (c, 1))).
+  filter(rec => rec._2._2 == None).
+  map(rec => rec._1).
+  distinct
+
+
+/**************************84. Set Operations - union, intersect, distinct as well as minus **********end*************/
+
+/**************************85. Save data in Text Input Format **********Start*************/
+
+#PROBLEM STATEMENT :
+1) get the order count by order_status:
+
+val orders = sc.textFile("/public/retail_db/orders")
+val orderCountByStatus = orders.map(o => (o.split(",")(3),1)).countByKey
+
+orderCountByStatus: scala.collection.Map[String,Long] = Map(PAYMENT_REVIEW -> 729, CLOSED -> 7556, SUSPECTED_FRAUD -> 1558, PROCESSING -> 8275, COMPLETE -> 22899, PENDING -> 7610, PENDING_PAYMENT -> 15030, ON_HOLD -> 3798, CANCELED -> 1428)
+
+
+#but Map doesnt have saveAsTextFile operation as it is not an RDD.
+so if we want to have same result but as RDD , use reduceByKey
+
+scala> val orderCountByStatus_byReduce = orders.map(o => (o.split(",")(3),1)).reduceByKey((a,b)=>(a+b))
+orderCountByStatus_byReduce: org.apache.spark.rdd.RDD[(String, Int)] = ShuffledRDD[68] at reduceByKey at <console>:29
+
+scala> orderCountByStatus_byReduce.sa
+sample             saveAsObjectFile   saveAsTextFile
+
+
+orderCountByStatus_byReduce.saveAsTextFile("/user/rajeshs/order_Count_by_status")
+
+scala> sc.textFile("/user/rajeshs/order_Count_by_status").collect.foreach(println)
+(PENDING_PAYMENT,15030)
+(CLOSED,7556)
+(CANCELED,1428)
+(PAYMENT_REVIEW,729)
+(PENDING,7610)
+(ON_HOLD,3798)
+(PROCESSING,8275)
+(SUSPECTED_FRAUD,1558)
+(COMPLETE,22899)
+
+#But if we have requirement to save the output file with tab delimetered, then before saveAsTextFile we need to reformat the data with help of map as below shown
+
+orderCountByStatus_byReduce.map(rec => rec._1+"\t"+rec._2)
+.saveAsTextFile("/user/rajeshs/order_Count_by_status")
+
+// delete the dirctory else we get error as it cannot override the same path.
+
+scala> sc.textFile("/user/rajeshs/order_Count_by_status").collect.foreach(println)
+PENDING_PAYMENT 15030
+CLOSED  7556
+CANCELED        1428
+PAYMENT_REVIEW  729
+PENDING 7610
+ON_HOLD 3798
+PROCESSING      8275
+SUSPECTED_FRAUD 1558
+COMPLETE        22899
+
+
+Final notes from resources :
+
+Saving RDD back to HDFS
+Make sure data is saved with proper delimiters
+Compression
+Data can be saved back to HDFS in different file formats
+
+RDD can be saved into a text file or sequence file
+Data Frames can be saved into other file formats
+Saving RDD – Text file format
+RDD have below APIs to save data into different file formats
+
+saveAsTextFile (most important and covered here)
+saveAsSequenceFile
+saveAsNewAPIHadoopFile
+saveAsObjectFile
+
+
+val orders = sc.textFile("/public/retail_db/orders")
+val orderCountByStatus = orders.map(order => (order.split(",")(3), 1)).reduceByKey((total, element) => total + element)
+orderCountByStatus.saveAsTextFile("/user/dgadiraju/order_count_by_status")
+
+
+
+/**************************85. Save data in Text Input Format **********end*************/
+
+
+/**************************86. Save data in Text Input Format using Compression **********Start*************/
+
+/etc/hadoop/conf
+
+cat core-site.xml
+
+    <property>
+      <name>io.compression.codecs</name>
+      <value>org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.SnappyCodec</value>
+    </property>
+
+
+io.compression.codecs = org.apache.hadoop.io.compress.GzipCodec,
+						org.apache.hadoop.io.compress.DefaultCodec,
+						org.apache.hadoop.io.compress.SnappyCodec
+
+
+
+val orders = sc.textFile("/public/retail_db/orders")
+val orderCountByStatus = orders.map(order => (order.split(",")(3), 1)).reduceByKey((total, element) => total + element)
+orderCountByStatus.saveAsTextFile("/user/dgadiraju/order_count_by_status")
+
+
+scala> orderCountByStatus_byReduce.saveAsTextFile("/user/rajeshs/order_count-by-status_snappy", classOf[org.apache.hadoop.io.compress.SnappyCodec])
+
+part-00001.snappy
+part-00002.snappy
+
+will be created as a result.
+
+
+
+sc.textFile("/user/rajeshs/order_count-by-status_snappy").collect.foreach(println)
+(PENDING_PAYMENT,15030)
+(CLOSED,7556)
+(CANCELED,1428)
+(PAYMENT_REVIEW,729)
+(PENDING,7610)
+(ON_HOLD,3798)
+(PROCESSING,8275)
+(SUSPECTED_FRAUD,1558)
+
+
+final notes from resources:
+
+Save data in Text Input Format using Compression
+
+
+Saving RDD – Compression
+Compression can reduce storage requirements significantly. It is important to understand how to compress the output while saving into HDFS.
+
+Only those compression codecs defined in /etc/hadoop/conf/core-site.xml can be used
+We can use the additional argument to pass compression codec while saving data using one of the APIs such as saveAsTextFile
+To read compressed data we do not need to use any codec. As long as the files are compressed in supported formats, we just need to use APIs such as sc.textFile to read the data (compressed or not does not matter)
+
+
+orderCountByStatus.saveAsTextFile("/user/dgadiraju/order_count_by_status_snappy", ClassOf[org.apache.hadoop.io.compress.SnappyCodec])
+Retrieving the Data
+hadoop fs -ls /user/dgadiraju/order_count_status_snappy
+sc.textFile("/user/dgadiraju/order_count-by-status_snappy").collect.foreach(println)
+
+
+/**************************86. Save data in Text Input Format using Compression **********end*************/
+
+
+/**************************87. Saving data in standard file formats - Overview **********Start*************/
+
+
+val ordersDF =sqlContext.read.json("/public/retail_db_json/orders")  // creating DataFrame
+ordersDF: org.apache.spark.sql.DataFrame = [order_customer_id: bigint, order_date: string, order_id: bigint, order_status: string]
+
+scala> ordersDF.save
+
+def save(path: String): Unit
+def save(path: String, mode: SaveMode): Unit
+def save(path: String, source: String): Unit
+def save(path: String, source: String, mode: SaveMode): Unit
+def save(source: String, mode: SaveMode, options: immutable.Map[String,String]): Unit
+def save(source: String, mode: SaveMode, options: java.util.Map[String,String]): Unit
+
+
+ordersDF.save("/user/rajeshs/orders_parquet","parquet")
+
+sqlContext.load("/user/rajeshs/orders_parquet", "parquet").show
++-----------------+--------------------+--------+---------------+
+|order_customer_id|          order_date|order_id|   order_status|
++-----------------+--------------------+--------+---------------+
+|            11599|2013-07-25 00:00:...|       1|         CLOSED|
+|              256|2013-07-25 00:00:...|       2|PENDING_PAYMENT|
+|            12111|2013-07-25 00:00:...|       3|       COMPLETE|
+|             8827|2013-07-25 00:00:...|       4|         CLOSED|
+|            11318|2013-07-25 00:00:...|       5|       COMPLETE|
+|             7130|2013-07-25 00:00:...|       6|       COMPLETE|
+|             4530|2013-07-25 00:00:...|       7|       COMPLETE|
+|             2911|2013-07-25 00:00:...|       8|     PROCESSING|
+|             5657|2013-07-25 00:00:...|       9|PENDING_PAYMENT|
+|             5648|2013-07-25 00:00:...|      10|PENDING_PAYMENT|
+|              918|2013-07-25 00:00:...|      11| PAYMENT_REVIEW|
+|             1837|2013-07-25 00:00:...|      12|         CLOSED|
+|             9149|2013-07-25 00:00:...|      13|PENDING_PAYMENT|
+|             9842|2013-07-25 00:00:...|      14|     PROCESSING|
+|             2568|2013-07-25 00:00:...|      15|       COMPLETE|
+|             7276|2013-07-25 00:00:...|      16|PENDING_PAYMENT|
+|             2667|2013-07-25 00:00:...|      17|       COMPLETE|
+|             1205|2013-07-25 00:00:...|      18|         CLOSED|
+|             9488|2013-07-25 00:00:...|      19|PENDING_PAYMENT|
+|             9198|2013-07-25 00:00:...|      20|     PROCESSING|
++-----------------+--------------------+--------+---------------+
+only showing top 20 rows
+
+scala> ordersDF.write.orc("/user/rajeshs/orders_orc")
+
+sqlContext.read.orc("/user/rajeshs/orders_orc").show
++-----------------+--------------------+--------+---------------+
+|order_customer_id|          order_date|order_id|   order_status|
++-----------------+--------------------+--------+---------------+
+|            11599|2013-07-25 00:00:...|       1|         CLOSED|
+|              256|2013-07-25 00:00:...|       2|PENDING_PAYMENT|
+|            12111|2013-07-25 00:00:...|       3|       COMPLETE|
+|             8827|2013-07-25 00:00:...|       4|         CLOSED|
+|            11318|2013-07-25 00:00:...|       5|       COMPLETE|
+|             7130|2013-07-25 00:00:...|       6|       COMPLETE|
+|             4530|2013-07-25 00:00:...|       7|       COMPLETE|
+|             2911|2013-07-25 00:00:...|       8|     PROCESSING|
+|             5657|2013-07-25 00:00:...|       9|PENDING_PAYMENT|
+|             5648|2013-07-25 00:00:...|      10|PENDING_PAYMENT|
+|              918|2013-07-25 00:00:...|      11| PAYMENT_REVIEW|
+|             1837|2013-07-25 00:00:...|      12|         CLOSED|
+|             9149|2013-07-25 00:00:...|      13|PENDING_PAYMENT|
+|             9842|2013-07-25 00:00:...|      14|     PROCESSING|
+|             2568|2013-07-25 00:00:...|      15|       COMPLETE|
+|             7276|2013-07-25 00:00:...|      16|PENDING_PAYMENT|
+|             2667|2013-07-25 00:00:...|      17|       COMPLETE|
+|             1205|2013-07-25 00:00:...|      18|         CLOSED|
+|             9488|2013-07-25 00:00:...|      19|PENDING_PAYMENT|
+|             9198|2013-07-25 00:00:...|      20|     PROCESSING|
++-----------------+--------------------+--------+---------------+
+only showing top 20 rows
+
+
+
+
+SAVE vs LOAD => takes two parameters  ,one is path and other is fil type
+WRITE vs READ => takes only one parameter , path (as these methods are called on specific file type, no need to mention the file type again)
+
+
+
+
+
+final notes from resources:
+
+
+
+Saving data in standard file formats – Overview
+
+
+
+Saving data in other formats
+We can convert data into a data frame and save data in any of these formats
+
+json (as shown below)
+parquet
+orc
+text
+csv (3rd party plugin)
+avro (3rd party plugin, but Cloudera clusters are well integrated with Avro)
+There are 2 APIs which can be used to save data frames
+
+save – takes 2 arguments, path, and file format
+write – provides interfaces such as json to save data in the path specified
+Steps to save into different file formats
+
+Make sure data is represented as Data Frame
+Use write or save API to save Data Frame into different file formats
+Use compression algorithm if required
+writing data into different file formats
+val ordersDF = sqlContext.read.json("/public/retail_db_json/orders")
+ordersDF.save("/user/dgadiraju/orders_parquet", "parquet")
+ordersDF.write("/user/dgadiraju/orders_orc")
+Reading the data
+sqlContext.load("/user/dgadiraju/orders_parquet", "parquet").show
+sqlContext.read.orc("/user/dgadiraju/orders_orc").show
+
+
+/**************************87. Saving data in standard file formats - Overview **********end*************/
+/user/rajeshs/orderDF_text_csv/orders.csv
+
+writing data into different file formats
+orders1DF.save("/user/orders_parquet", "parquet")
+ordersDF.write.orc("/user/orders_orc")
+
+Reading the data
+sqlContext.load("/user/orders_parquet", "parquet").show
+sqlContext.read.orc("/user/orders_orc").show
+
+
+
+/**************************88. Revision of Problem Statement and Design the solution **********start*********************/*************/
+
+
+
+
+/**************************88. Revision of Problem Statement and Design the solution **********end*********************/*************/
+
