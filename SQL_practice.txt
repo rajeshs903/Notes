@@ -1,11 +1,7 @@
 mysql -u retail_dba -h nn01.itversity.com -p
 password : itversity
-
 mysql> use retail_export;
  
- 
- select * from 
-
 
 /***********/
 
