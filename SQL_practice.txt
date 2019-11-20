@@ -2,9 +2,7 @@ mysql -u retail_dba -h nn01.itversity.com -p
 password : itversity
 mysql> use retail_export;
  
-
 /***********/
-
 To practice Rank over , created a table 'person' in retail_export db
 
 CREATE TABLE person (id int, first_name varchar(20), age int, gender char(1));
@@ -35,7 +33,6 @@ ORDER BY  age;
 | Steve      |   36 | M      |    8 |
 +------------+------+--------+------+
 8 rows in set (0.02 sec)
-
 
 select * from person;
 mysql> select * from person;
