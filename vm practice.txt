@@ -1,12 +1,12 @@
 sqoop eval --connect jdbc:mysql://quickstart.cloudera:3306/retail_db --username root --P --query "select * from order_items limit 10"
 password : cloudera
-
 1) sqoop import with only few columns
 Sqoop import from account table only with selected columns
 only order_status that are completed
 
 sqoop eval --connect jdbc:mysql://quickstart.cloudera:3306/retail_db --username root --P --query "select * from order_items limit 10"
 password : cloudera
+
 
 sqoop import \
 --connect jdbc:mysql://quickstart.cloudera:3306/retail_db \
